@@ -255,7 +255,16 @@ export default function TenantsPage() {
         const selectedProperty = properties.find(p => p.id === propertyId);
 
         const tenantData = {
-            ...currentTenant,
+            firstName: currentTenant.firstName || '',
+            lastName: currentTenant.lastName || '',
+            email: currentTenant.email || '',
+            phone: currentTenant.phone || '',
+            nationalId: currentTenant.nationalId || '',
+            nationality: currentTenant.nationality || '',
+            bankAccount: currentTenant.bankAccount || '',
+            propertyId: currentTenant.propertyId || '',
+            leaseStart: currentTenant.leaseStart || '',
+            leaseDuration: currentTenant.leaseDuration || 0,
             idCardUrl,
             idCardPath,
             status: 'Actif',

@@ -60,10 +60,11 @@ type Payment = {
 
 type Tenant = {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   phone: string;
   email: string;
-  property: string;
+  propertyName: string;
 };
 
 const WhatsappIcon = () => (
@@ -71,7 +72,7 @@ const WhatsappIcon = () => (
     xmlns="http://www.w3.org/2000/svg"
     width="24"
     height="24"
-    viewBox="0 0 24 24"
+    viewBox="0 0 24"
     fill="none"
     stroke="currentColor"
     strokeWidth="2"
@@ -131,11 +132,11 @@ export default function PaymentsPage() {
 
     try {
       await addDoc(collection(db, "payments"), {
-        tenant: tenant.name,
+        tenant: `${tenant.firstName} ${tenant.lastName}`,
         tenantId: tenant.id,
         phone: tenant.phone,
         email: tenant.email,
-        property: tenant.property,
+        property: tenant.propertyName,
         date: newPayment.date,
         amount: parseFloat(newPayment.amount),
         status: newPayment.status,
@@ -328,7 +329,7 @@ export default function PaymentsPage() {
                     </SelectTrigger>
                     <SelectContent>
                         {tenants.map(t => (
-                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                            <SelectItem key={t.id} value={t.id}>{t.firstName} {t.lastName}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
