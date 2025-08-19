@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { MoreHorizontal, Upload, FileText, FileSpreadsheet, FileImage } from "lucide-react";
+import { MoreHorizontal, Upload, FileText, FileSpreadsheet, FileImage, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,85 +27,107 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { db, storage } from "@/lib/firebase";
+import { collection, addDoc, onSnapshot, deleteDoc, doc, DocumentData } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { useToast } from "@/hooks/use-toast";
 
-const initialDocuments = [
-  {
-    name: "Bail-Bruxelles-Dupont.pdf",
-    type: "Contrat de location",
-    size: "1.2 MB",
-    uploaded: "2024-01-15",
-    icon: <FileText className="h-5 w-5 text-muted-foreground" />,
-  },
-  {
-    name: "Infos-Locataires-2024.xlsx",
-    type: "Tableur",
-    size: "450 KB",
-    uploaded: "2024-02-01",
-    icon: <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />,
-  },
-  {
-    name: "Inspection-Propriété-Anvers.jpg",
-    type: "Image",
-    size: "4.5 MB",
-    uploaded: "2024-07-10",
-    icon: <FileImage className="h-5 w-5 text-muted-foreground" />,
-  },
-  {
-    name: "Avis-entree-Martin.pdf",
-    type: "Avis",
-    size: "300 KB",
-    uploaded: "2024-07-20",
-    icon: <FileText className="h-5 w-5 text-muted-foreground" />,
-  },
-  {
-    name: "Recu-Loyer-Juillet-Dubois.pdf",
-    type: "Reçu",
-    size: "250 KB",
-    uploaded: "2024-07-05",
-    icon: <FileText className="h-5 w-5 text-muted-foreground" />,
-  },
-];
+type Document = {
+  id: string;
+  name: string;
+  type: string;
+  size: string;
+  uploaded: string;
+  url: string;
+  path: string;
+};
 
 const getFileIcon = (fileName: string) => {
     if (fileName.endsWith('.pdf')) return <FileText className="h-5 w-5 text-muted-foreground" />;
     if (fileName.endsWith('.xlsx')) return <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />;
-    if (fileName.endsWith('.jpg') || fileName.endsWith('.png')) return <FileImage className="h-5 w-5 text-muted-foreground" />;
+    if (fileName.endsWith('.jpg') || fileName.endsWith('.png') || fileName.endsWith('.jpeg')) return <FileImage className="h-5 w-5 text-muted-foreground" />;
     return <FileText className="h-5 w-5 text-muted-foreground" />;
 }
 
-
 export default function DocumentsPage() {
-    const [documents, setDocuments] = useState(initialDocuments);
+    const [documents, setDocuments] = useState<Document[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { toast } = useToast();
+
+    useEffect(() => {
+      const unsubscribe = onSnapshot(collection(db, "documents"), (snapshot) => {
+        const docsData: Document[] = [];
+        snapshot.forEach((doc: DocumentData) => {
+          docsData.push({ id: doc.id, ...doc.data() } as Document);
+        });
+        setDocuments(docsData.sort((a,b) => new Date(b.uploaded).getTime() - new Date(a.uploaded).getTime()));
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    }, []);
 
     const handleUploadClick = () => {
         fileInputRef.current?.click();
     }
     
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
-            const newDoc = {
-                name: file.name,
-                type: file.type,
-                size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-                uploaded: new Date().toISOString().split('T')[0],
-                icon: getFileIcon(file.name)
+            setUploading(true);
+            try {
+                const storagePath = `documents/${Date.now()}_${file.name}`;
+                const storageRef = ref(storage, storagePath);
+                await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(storageRef);
+
+                await addDoc(collection(db, "documents"), {
+                    name: file.name,
+                    type: file.type,
+                    size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+                    uploaded: new Date().toISOString().split('T')[0],
+                    url: downloadURL,
+                    path: storagePath,
+                });
+
+                toast({ title: "Succès", description: "Document téléchargé." });
+            } catch (error) {
+                console.error("Error uploading file:", error);
+                toast({ variant: "destructive", title: "Erreur", description: "Impossible de télécharger le document." });
+            } finally {
+                setUploading(false);
+                // Reset file input
+                if(fileInputRef.current) fileInputRef.current.value = "";
             }
-            setDocuments(prev => [newDoc, ...prev]);
         }
     }
     
-    const handleDelete = (name: string) => {
-        setDocuments(prev => prev.filter(doc => doc.name !== name));
+    const handleDelete = async (docToDelete: Document) => {
+        if (window.confirm("Êtes-vous sûr de vouloir supprimer ce document ?")) {
+            try {
+                // Delete file from storage
+                const fileRef = ref(storage, docToDelete.path);
+                await deleteObject(fileRef);
+
+                // Delete doc from firestore
+                await deleteDoc(doc(db, "documents", docToDelete.id));
+
+                toast({ title: "Succès", description: "Document supprimé." });
+
+            } catch (error) {
+                console.error("Error deleting document:", error);
+                toast({ variant: "destructive", title: "Erreur", description: "Impossible de supprimer le document." });
+            }
+        }
     }
 
   return (
     <div className="flex flex-col h-full">
       <Header title="Documents">
-        <Button size="sm" className="gap-1" onClick={handleUploadClick}>
-          <Upload className="h-3.5 w-3.5" />
-          Télécharger un document
+        <Button size="sm" className="gap-1" onClick={handleUploadClick} disabled={uploading}>
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <Upload className="h-3.5 w-3.5" />}
+          {uploading ? 'Téléchargement...' : 'Télécharger un document'}
         </Button>
         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
       </Header>
@@ -118,6 +140,11 @@ export default function DocumentsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {loading ? (
+               <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -132,11 +159,11 @@ export default function DocumentsPage() {
               </TableHeader>
               <TableBody>
                 {documents.map((doc) => (
-                  <TableRow key={doc.name}>
+                  <TableRow key={doc.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        {doc.icon}
-                        <span className="font-medium">{doc.name}</span>
+                        {getFileIcon(doc.name)}
+                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">{doc.name}</a>
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{doc.type}</TableCell>
@@ -152,9 +179,13 @@ export default function DocumentsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem>Télécharger</DropdownMenuItem>
-                          <DropdownMenuItem>Partager</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(doc.name)}>Supprimer</DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <a href={doc.url} target="_blank" rel="noopener noreferrer">Télécharger</a>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigator.clipboard.writeText(doc.url).then(() => toast({title: 'Lien copié'}))}>
+                            Partager
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(doc)}>Supprimer</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -162,6 +193,7 @@ export default function DocumentsPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
           </CardContent>
         </Card>
       </div>

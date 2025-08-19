@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,62 +39,24 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, onSnapshot, deleteDoc, doc, DocumentData } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 
-const initialTenants = [
-  {
-    id: "T001",
-    name: "Jean Dupont",
-    email: "jean.dupont@example.com",
-    phone: "+32470123456",
-    nationalId: "85.01.15-123.45",
-    property: "Appt 101, Rue de la Loi 1, 1000 Bruxelles",
-    status: "Actif",
-    leaseEnd: "2024-12-31",
-  },
-  {
-    id: "T002",
-    name: "Marie Dubois",
-    email: "marie.dubois@example.com",
-    phone: "+32486123456",
-    nationalId: "90.03.20-111.22",
-    property: "Unité 5, Grote Markt 1, 2000 Antwerpen",
-    status: "Actif",
-    leaseEnd: "2025-06-30",
-  },
-  {
-    id: "T003",
-    name: "Luc Martin",
-    email: "luc.martin@example.com",
-    phone: "+32495123456",
-    nationalId: "88.11.05-222.33",
-    property: "Appt 202, Rue de la Loi 1, 1000 Bruxelles",
-    status: "Partant",
-    leaseEnd: "2024-08-31",
-  },
-  {
-    id: "T004",
-    name: "Sophie Bernard",
-    email: "sophie.b@example.com",
-    phone: "+32475123456",
-    nationalId: "92.07.18-333.44",
-    property: "Maison, Rue Neuve 25, 1000 Bruxelles",
-    status: "En retard",
-    leaseEnd: "2025-01-31",
-  },
-    {
-    id: "T005",
-    name: "David Leroy",
-    email: "david.leroy@example.com",
-    phone: "+32460123456",
-    nationalId: "80.02.29-444.55",
-    property: "Condo 3, Place Saint-Lambert 1, 4000 Liège",
-    status: "Actif",
-    leaseEnd: "2024-11-30",
-  },
-];
+type Tenant = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  nationalId: string;
+  property: string;
+  status: string;
+  leaseEnd: string;
+};
 
 export default function TenantsPage() {
-  const [tenants, setTenants] = useState(initialTenants);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isAddTenantOpen, setIsAddTenantOpen] = useState(false);
   const [newTenant, setNewTenant] = useState({
     name: "",
@@ -104,19 +66,76 @@ export default function TenantsPage() {
     property: "",
     leaseEnd: "",
   });
+  const { toast } = useToast();
 
-  const handleAddTenant = () => {
-    setTenants(prev => [...prev, {
-      id: `T${String(prev.length + 1).padStart(3, '0')}`,
-      ...newTenant,
-      status: "Actif"
-    }]);
-    setNewTenant({ name: "", email: "", phone: "", nationalId: "", property: "", leaseEnd: "" });
-    setIsAddTenantOpen(false);
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "tenants"), (snapshot) => {
+      const tenantsData: Tenant[] = [];
+      snapshot.forEach((doc: DocumentData) => {
+        tenantsData.push({ id: doc.id, ...doc.data() } as Tenant);
+      });
+      setTenants(tenantsData);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching tenants:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de charger les locataires.",
+      });
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [toast]);
+
+  const handleAddTenant = async () => {
+    if (!newTenant.name || !newTenant.email) {
+       toast({
+        variant: "destructive",
+        title: "Champs requis",
+        description: "Le nom et l'email sont obligatoires.",
+      });
+      return;
+    }
+    try {
+      await addDoc(collection(db, "tenants"), {
+        ...newTenant,
+        status: "Actif"
+      });
+      setNewTenant({ name: "", email: "", phone: "", nationalId: "", property: "", leaseEnd: "" });
+      setIsAddTenantOpen(false);
+      toast({
+        title: "Succès",
+        description: "Nouveau locataire ajouté.",
+      });
+    } catch (error) {
+      console.error("Error adding tenant: ", error);
+       toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible d'ajouter le locataire.",
+      });
+    }
   }
 
-  const handleDeleteTenant = (id: string) => {
-    setTenants(prev => prev.filter(t => t.id !== id));
+  const handleDeleteTenant = async (id: string) => {
+    if(window.confirm("Êtes-vous sûr de vouloir supprimer ce locataire ?")) {
+      try {
+        await deleteDoc(doc(db, "tenants", id));
+        toast({
+          title: "Succès",
+          description: "Locataire supprimé.",
+        });
+      } catch (error) {
+        console.error("Error deleting tenant: ", error);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de supprimer le locataire.",
+        });
+      }
+    }
   }
   
   return (
@@ -136,6 +155,11 @@ export default function TenantsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -181,6 +205,7 @@ export default function TenantsPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
           </CardContent>
         </Card>
       </div>

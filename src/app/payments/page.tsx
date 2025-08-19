@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle, Printer } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Printer, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,49 +28,41 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, onSnapshot, doc, DocumentData } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 
-const initialPayments = [
-  {
-    id: "PAY-2024-001",
-    tenant: "Jean Dupont",
-    phone: "+32470123456",
-    property: "Appt 101, Rue de la Loi 1",
-    date: "2024-07-01",
-    amount: 1200,
-    status: "Payé",
-    period: "Juillet 2024",
-  },
-  {
-    id: "PAY-2024-002",
-    tenant: "Marie Dubois",
-    phone: "+32486123456",
-    property: "Unité 5, Grote Markt 1",
-    date: "2024-07-03",
-    amount: 1500,
-    status: "Payé",
-    period: "Juillet 2024",
-  },
-  {
-    id: "PAY-2024-003",
-    tenant: "Sophie Bernard",
-    phone: "+32475123456",
-    property: "Maison, Rue Neuve 25",
-    date: "2024-07-05",
-    amount: 2500,
-    status: "En retard",
-    period: "Juillet 2024",
-  },
-  {
-    id: "PAY-2024-004",
-    tenant: "Luc Martin",
-    phone: "+32495123456",
-    property: "Appt 202, Rue de la Loi 1",
-    date: "2024-06-01",
-    amount: 1250,
-    status: "Payé",
-    period: "Juin 2024",
-  },
-];
+
+type Payment = {
+  id: string;
+  tenant: string;
+  tenantId: string;
+  phone: string;
+  property: string;
+  date: string;
+  amount: number;
+  status: string;
+  period: string;
+};
+
+type Tenant = {
+  id: string;
+  name: string;
+  phone: string;
+  property: string;
+};
 
 const WhatsappIcon = () => (
   <svg
@@ -91,15 +83,87 @@ const WhatsappIcon = () => (
 
 
 export default function PaymentsPage() {
-  const [payments, setPayments] = useState(initialPayments);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAddPaymentOpen, setIsAddPaymentOpen] = useState(false);
+  const [newPayment, setNewPayment] = useState({
+    tenantId: "",
+    date: new Date().toISOString().split('T')[0],
+    amount: "",
+    status: "Payé",
+    period: `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
+  });
+  const { toast } = useToast();
 
-  const handleSendReceipt = (payment: typeof payments[0]) => {
+  useEffect(() => {
+    const unsubPayments = onSnapshot(collection(db, "payments"), (snapshot) => {
+      const paymentsData: Payment[] = [];
+      snapshot.forEach((doc: DocumentData) => {
+        paymentsData.push({ id: doc.id, ...doc.data() } as Payment);
+      });
+      setPayments(paymentsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setLoading(false);
+    });
+
+    const unsubTenants = onSnapshot(collection(db, "tenants"), (snapshot) => {
+      const tenantsData: Tenant[] = [];
+      snapshot.forEach((doc: DocumentData) => {
+        tenantsData.push({ id: doc.id, ...doc.data() } as Tenant);
+      });
+      setTenants(tenantsData);
+    });
+
+    return () => {
+      unsubPayments();
+      unsubTenants();
+    };
+  }, []);
+
+  const handleAddPayment = async () => {
+    const tenant = tenants.find(t => t.id === newPayment.tenantId);
+    if (!tenant || !newPayment.amount || !newPayment.date) {
+      toast({ variant: "destructive", title: "Erreur", description: "Veuillez remplir tous les champs."});
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, "payments"), {
+        tenant: tenant.name,
+        tenantId: tenant.id,
+        phone: tenant.phone,
+        property: tenant.property,
+        date: newPayment.date,
+        amount: parseFloat(newPayment.amount),
+        status: newPayment.status,
+        period: newPayment.period,
+      });
+      setIsAddPaymentOpen(false);
+      setNewPayment({
+        tenantId: "",
+        date: new Date().toISOString().split('T')[0],
+        amount: "",
+        status: "Payé",
+        period: `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
+      });
+      toast({ title: "Succès", description: "Paiement ajouté."});
+    } catch (error) {
+       console.error("Error adding payment:", error);
+       toast({ variant: "destructive", title: "Erreur", description: "Impossible d'ajouter le paiement."});
+    }
+  };
+
+  const handleSendReceipt = (payment: Payment) => {
+    if (!payment.phone) {
+      toast({ variant: "destructive", title: "Erreur", description: "Numéro de téléphone du locataire manquant."});
+      return;
+    }
     const receiptText = `Bonjour ${payment.tenant},\n\nVoici votre reçu pour le loyer de ${payment.period}.\n\nMontant : ${payment.amount.toFixed(2)} €\nDate de paiement : ${payment.date}\nPropriété : ${payment.property}\n\nMerci.`;
-    const whatsappUrl = `https://wa.me/${payment.phone}?text=${encodeURIComponent(receiptText)}`;
+    const whatsappUrl = `https://wa.me/${payment.phone.replace(/\D/g, '')}?text=${encodeURIComponent(receiptText)}`;
     window.open(whatsappUrl, '_blank');
   };
   
-  const handlePrintReceipt = (payment: typeof payments[0]) => {
+  const handlePrintReceipt = (payment: Payment) => {
      const receiptContent = `
       <html>
         <head>
@@ -133,7 +197,7 @@ export default function PaymentsPage() {
   return (
     <div className="flex flex-col h-full">
       <Header title="Paiements">
-        <Button size="sm" className="gap-1" onClick={() => alert('Fonctionnalité à implémenter')}>
+        <Button size="sm" className="gap-1" onClick={() => setIsAddPaymentOpen(true)}>
           <PlusCircle className="h-3.5 w-3.5" />
           Ajouter un paiement
         </Button>
@@ -147,6 +211,11 @@ export default function PaymentsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+             {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -196,9 +265,64 @@ export default function PaymentsPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={isAddPaymentOpen} onOpenChange={setIsAddPaymentOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajouter un paiement</DialogTitle>
+            <DialogDescription>
+              Enregistrez un nouveau paiement de loyer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+             <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="tenant" className="text-right">Locataire</Label>
+                <Select onValueChange={(value) => setNewPayment({...newPayment, tenantId: value})}>
+                    <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Sélectionnez un locataire" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {tenants.map(t => (
+                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="amount" className="text-right">Montant (€)</Label>
+              <Input id="amount" type="number" value={newPayment.amount} onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="date" className="text-right">Date</Label>
+              <Input id="date" type="date" value={newPayment.date} onChange={(e) => setNewPayment({...newPayment, date: e.target.value})} className="col-span-3" />
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="period" className="text-right">Période</Label>
+              <Input id="period" value={newPayment.period} onChange={(e) => setNewPayment({...newPayment, period: e.target.value})} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="status" className="text-right">Statut</Label>
+                <Select value={newPayment.status} onValueChange={(value) => setNewPayment({...newPayment, status: value})}>
+                    <SelectTrigger className="col-span-3">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Payé">Payé</SelectItem>
+                        <SelectItem value="En retard">En retard</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
+            <Button onClick={handleAddPayment}>Ajouter</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle, Bell, Send } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Bell, Send, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,94 +40,96 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, onSnapshot, doc, updateDoc, DocumentData } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 
+type Reminder = {
+  id: string;
+  tenant: string;
+  tenantId: string;
+  property: string;
+  dueDate: string;
+  amount: number;
+  status: "Envoyé" | "En attente" | "Programmé";
+};
 
-const initialReminders = [
-  {
-    id: "R001",
-    tenant: "Jean Dupont",
-    tenantId: "T001",
-    property: "Appt 101, Rue de la Loi 1, 1000 Bruxelles",
-    dueDate: "2024-08-01",
-    amount: 1200,
-    status: "Envoyé",
-  },
-  {
-    id: "R002",
-    tenant: "Marie Dubois",
-    tenantId: "T002",
-    property: "Unité 5, Grote Markt 1, 2000 Antwerpen",
-    dueDate: "2024-08-01",
-    amount: 1500,
-    status: "Envoyé",
-  },
-  {
-    id: "R003",
-    tenant: "Luc Martin",
-    tenantId: "T003",
-    property: "Appt 202, Rue de la Loi 1, 1000 Bruxelles",
-    dueDate: "2024-08-01",
-    amount: 1250,
-    status: "En attente",
-  },
-  {
-    id: "R004",
-    tenant: "Sophie Bernard",
-    tenantId: "T004",
-    property: "Maison, Rue Neuve 25, 1000 Bruxelles",
-    dueDate: "2024-08-01",
-    amount: 2500,
-    status: "Programmé",
-  },
-  {
-    id: "R005",
-    tenant: "David Leroy",
-    tenantId: "T005",
-    property: "Condo 3, Place Saint-Lambert 1, 4000 Liège",
-    dueDate: "2024-09-01",
-    amount: 1800,
-    status: "Programmé",
-  },
-];
-
-// Mock tenants for the select dropdown
-const tenants = [
-   { id: "T001", name: "Jean Dupont", amount: 1200 },
-   { id: "T002", name: "Marie Dubois", amount: 1500 },
-   { id: "T003", name: "Luc Martin", amount: 1250 },
-   { id: "T004", name: "Sophie Bernard", amount: 2500 },
-   { id: "T005", name: "David Leroy", amount: 1800 },
-];
-
+type Tenant = {
+  id: string;
+  name: string;
+  property: string;
+};
 
 export default function RemindersPage() {
-    const [reminders, setReminders] = useState(initialReminders);
+    const [reminders, setReminders] = useState<Reminder[]>([]);
+    const [tenants, setTenants] = useState<Tenant[]>([]);
+    const [loading, setLoading] = useState(true);
     const [isAddReminderOpen, setIsAddReminderOpen] = useState(false);
     const [newReminder, setNewReminder] = useState({
         tenantId: "",
         dueDate: "",
         amount: ""
     });
+    const { toast } = useToast();
 
-    const handleAddReminder = () => {
+    useEffect(() => {
+        const unsubReminders = onSnapshot(collection(db, "reminders"), (snapshot) => {
+          const data: Reminder[] = [];
+          snapshot.forEach((doc: DocumentData) => {
+            data.push({ id: doc.id, ...doc.data() } as Reminder);
+          });
+          setReminders(data.sort((a,b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()));
+          setLoading(false);
+        });
+
+        const unsubTenants = onSnapshot(collection(db, "tenants"), (snapshot) => {
+          const data: Tenant[] = [];
+          snapshot.forEach((doc: DocumentData) => {
+            data.push({ id: doc.id, ...doc.data() } as Tenant);
+          });
+          setTenants(data);
+        });
+
+        return () => {
+          unsubReminders();
+          unsubTenants();
+        };
+    }, []);
+
+    const handleAddReminder = async () => {
         const tenant = tenants.find(t => t.id === newReminder.tenantId);
-        if (!tenant) return;
+        if (!tenant || !newReminder.dueDate || !newReminder.amount) {
+            toast({ variant: "destructive", title: "Erreur", description: "Veuillez remplir tous les champs." });
+            return;
+        }
 
-        setReminders(prev => [...prev, {
-            id: `R${String(prev.length + 1).padStart(3, '0')}`,
-            tenant: tenant.name,
-            tenantId: tenant.id,
-            property: "Propriété à récupérer",
-            dueDate: newReminder.dueDate,
-            amount: parseFloat(newReminder.amount) || tenant.amount,
-            status: "Programmé"
-        }]);
-        setNewReminder({ tenantId: "", dueDate: "", amount: "" });
-        setIsAddReminderOpen(false);
+        try {
+            await addDoc(collection(db, "reminders"), {
+                tenant: tenant.name,
+                tenantId: tenant.id,
+                property: tenant.property,
+                dueDate: newReminder.dueDate,
+                amount: parseFloat(newReminder.amount),
+                status: "Programmé"
+            });
+            setNewReminder({ tenantId: "", dueDate: "", amount: "" });
+            setIsAddReminderOpen(false);
+            toast({ title: "Succès", description: "Rappel programmé." });
+        } catch (error) {
+            console.error("Error adding reminder:", error);
+            toast({ variant: "destructive", title: "Erreur", description: "Impossible de programmer le rappel." });
+        }
     }
     
-    const sendReminder = (id: string) => {
-        setReminders(reminders.map(r => r.id === id ? { ...r, status: "Envoyé" } : r));
+    const sendReminder = async (id: string) => {
+        try {
+            const reminderRef = doc(db, "reminders", id);
+            await updateDoc(reminderRef, { status: "Envoyé" });
+            toast({ title: "Succès", description: "Rappel marqué comme envoyé." });
+        } catch (error) {
+             console.error("Error sending reminder:", error);
+            toast({ variant: "destructive", title: "Erreur", description: "Impossible de mettre à jour le rappel." });
+        }
     }
 
   return (
@@ -143,10 +145,15 @@ export default function RemindersPage() {
           <CardHeader>
             <CardTitle className="font-headline">Rappels automatisés</CardTitle>
             <CardDescription>
-              Gérez et suivez les rappels de loyer automatisés envoyés aux locataires.
+              Gérez et suivez les rappels de loyer envoyés aux locataires.
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -182,7 +189,7 @@ export default function RemindersPage() {
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuItem disabled={reminder.status === 'Envoyé'} onClick={() => sendReminder(reminder.id)}>
                             <Send className="mr-2 h-4 w-4" />
-                            Envoyer maintenant
+                            Marquer comme envoyé
                           </DropdownMenuItem>
                           <DropdownMenuItem>
                             <Bell className="mr-2 h-4 w-4" />
@@ -195,6 +202,7 @@ export default function RemindersPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -222,7 +230,7 @@ export default function RemindersPage() {
             </div>
              <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="amount" className="text-right">Montant (€)</Label>
-              <Input id="amount" type="number" value={newReminder.amount} placeholder={`par défaut: ${tenants.find(t => t.id === newReminder.tenantId)?.amount || '0.00'}`} onChange={(e) => setNewReminder({...newReminder, amount: e.target.value})} className="col-span-3" />
+              <Input id="amount" type="number" value={newReminder.amount} placeholder="Montant du loyer" onChange={(e) => setNewReminder({...newReminder, amount: e.target.value})} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="dueDate" className="text-right">Date d'échéance</Label>
