@@ -1,5 +1,6 @@
 
 
+
 export type OwnerInfo = {
   name: string;
   address: string;
@@ -27,6 +28,8 @@ export type Tenant = {
   idCardPath: string;
   rent: number;
   paymentDueDay: number;
+  depositAmount: number;
+  depositStatus: 'Non payé' | 'Payé' | 'Remboursé' | 'Partiellement remboursé';
 };
 
 export type Property = {

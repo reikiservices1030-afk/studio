@@ -31,6 +31,7 @@ import {
   Camera,
   Upload,
   Trash2,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -90,6 +91,7 @@ export default function TenantsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [currentTenant, setCurrentTenant] = useState<Partial<Tenant>>({});
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
@@ -262,6 +264,8 @@ export default function TenantsPage() {
             propertyName: selectedProperty?.address || 'N/A',
             rent: selectedProperty.rent,
             paymentDueDay: currentTenant.paymentDueDay || 1,
+            depositAmount: currentTenant.depositAmount || 0,
+            depositStatus: currentTenant.depositStatus || 'Non payé',
         };
 
         if (isEditing && currentTenant.id) {
@@ -309,6 +313,24 @@ export default function TenantsPage() {
     setCurrentTenant(tenant);
     setIsViewOpen(true);
   };
+  
+  const openDepositDialog = (tenant: Tenant) => {
+    setCurrentTenant(tenant);
+    setIsDepositOpen(true);
+  };
+  
+  const handleDepositSave = async () => {
+    if (!currentTenant.id || !currentTenant.depositStatus) return;
+    try {
+        const tenantRef = dbRef(db, `tenants/${currentTenant.id}`);
+        await update(tenantRef, { depositStatus: currentTenant.depositStatus });
+        toast({ title: 'Succès', description: 'Statut de la caution mis à jour.' });
+        setIsDepositOpen(false);
+    } catch(error) {
+        console.error('Error updating deposit status:', error);
+        toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de mettre à jour le statut.' });
+    }
+  }
 
   const sendMessage = (tenant: Tenant) => {
     if (!tenant.phone) {
@@ -328,8 +350,9 @@ export default function TenantsPage() {
     }
 
     const leaseEndDate = new Date(tenant.leaseStart);
-    leaseEndDate.setFullYear(leaseEndDate.getFullYear() + (tenant.leaseDuration / 12));
-    
+    leaseEndDate.setFullYear(leaseEndDate.getFullYear() + Math.floor((tenant.leaseDuration || 0) / 12));
+    leaseEndDate.setMonth(leaseEndDate.getMonth() + ((tenant.leaseDuration || 0) % 12));
+
     const leaseContent = `
       <html>
         <head>
@@ -391,7 +414,7 @@ export default function TenantsPage() {
 
            <div class="section">
             <h2>Article 3 : Garantie locative</h2>
-            <p>Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer, soit ${(property.rent * 2).toFixed(2)} €. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.</p>
+            <p>Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer, soit <strong>${tenant.depositAmount.toFixed(2)} €</strong>. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.</p>
           </div>
 
           <div class="section signatures">
@@ -421,7 +444,7 @@ export default function TenantsPage() {
   return (
     <div className="flex flex-col h-full">
       <Header title="Locataires">
-        <Button size="sm" className="gap-1" onClick={() => { setIsEditing(false); setCurrentTenant({paymentDueDay: 1}); setIsDialogOpen(true); }}>
+        <Button size="sm" className="gap-1" onClick={() => { setIsEditing(false); setCurrentTenant({paymentDueDay: 1, depositStatus: 'Non payé'}); setIsDialogOpen(true); }}>
           <PlusCircle className="h-3.5 w-3.5" />
           Ajouter un locataire
         </Button>
@@ -461,6 +484,7 @@ export default function TenantsPage() {
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => openViewDialog(tenant)}><Eye className="mr-2 h-4 w-4" />Voir les détails</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => sendMessage(tenant)}><WhatsappIcon /><span className="ml-2">Envoyer un message</span></DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openDepositDialog(tenant)}><ShieldCheck className="mr-2 h-4 w-4" />Gérer la caution</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openEditDialog(tenant)}><Edit className="mr-2 h-4 w-4" />Modifier</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => generateLease(tenant)}><FileText className="mr-2 h-4 w-4" />Générer le bail</DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(tenant)}><Trash2 className="mr-2 h-4 w-4"/>Supprimer</DropdownMenuItem>
@@ -496,13 +520,26 @@ export default function TenantsPage() {
             <div className="space-y-2"><Label>N° Compte Bancaire</Label><Input value={currentTenant.bankAccount || ''} onChange={(e) => setCurrentTenant({...currentTenant, bankAccount: e.target.value})} /></div>
             <div className="space-y-2">
                 <Label>Propriété à louer</Label>
-                <Select value={currentTenant.propertyId} onValueChange={(value) => setCurrentTenant({...currentTenant, propertyId: value})}>
+                <Select value={currentTenant.propertyId} onValueChange={(value) => {
+                    const selectedProperty = properties.find(p => p.id === value);
+                    setCurrentTenant({
+                        ...currentTenant,
+                        propertyId: value,
+                        depositAmount: selectedProperty ? selectedProperty.rent * 2 : 0,
+                    });
+                }}>
                     <SelectTrigger><SelectValue placeholder="Sélectionnez une propriété" /></SelectTrigger>
                     <SelectContent>
                         {properties.map(p => (<SelectItem key={p.id} value={p.id}>{p.address} - {p.rent}€</SelectItem>))}
                     </SelectContent>
                 </Select>
             </div>
+            {currentTenant.propertyId && (
+                <div className="space-y-2">
+                    <Label>Caution (2 mois de loyer)</Label>
+                    <Input value={`${currentTenant.depositAmount?.toFixed(2) || '0.00'} €`} disabled />
+                </div>
+            )}
              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2"><Label>Date de début du bail</Label><Input type="date" value={currentTenant.leaseStart || ''} onChange={(e) => setCurrentTenant({...currentTenant, leaseStart: e.target.value})} /></div>
                 <div className="space-y-2"><Label>Durée du bail (mois)</Label><Input type="number" value={currentTenant.leaseDuration || ''} onChange={(e) => setCurrentTenant({...currentTenant, leaseDuration: Number(e.target.value)})} /></div>
@@ -547,10 +584,47 @@ export default function TenantsPage() {
                       <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Début du bail:</div><div className="col-span-2 font-medium">{currentTenant.leaseStart}</div></div>
                       <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Durée:</div><div className="col-span-2 font-medium">{currentTenant.leaseDuration} mois</div></div>
                       <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Statut:</div><div className="col-span-2 font-medium"><Badge variant={currentTenant.status === 'Actif' ? 'secondary' : 'destructive'}>{currentTenant.status}</Badge></div></div>
+                      <hr className="col-span-3"/>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Caution:</div><div className="col-span-2 font-medium">{currentTenant.depositAmount?.toFixed(2)} €</div></div>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Statut caution:</div><div className="col-span-2 font-medium"><Badge>{currentTenant.depositStatus}</Badge></div></div>
                   </div>
               )}
               <DialogFooter><DialogClose asChild><Button variant="outline">Fermer</Button></DialogClose></DialogFooter>
           </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isDepositOpen} onOpenChange={setIsDepositOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Gérer la caution</DialogTitle>
+                <DialogDescription>Mettre à jour le statut de la caution pour {currentTenant.firstName} {currentTenant.lastName}.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+                <div>
+                    <Label>Montant de la caution</Label>
+                    <Input value={`${currentTenant.depositAmount?.toFixed(2) || '0.00'} €`} disabled />
+                </div>
+                <div>
+                    <Label>Statut de la caution</Label>
+                     <Select 
+                        value={currentTenant.depositStatus} 
+                        onValueChange={(value) => setCurrentTenant({...currentTenant, depositStatus: value as Tenant['depositStatus']})}
+                    >
+                        <SelectTrigger><SelectValue/></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Non payé">Non payé</SelectItem>
+                            <SelectItem value="Payé">Payé</SelectItem>
+                            <SelectItem value="Remboursé">Remboursé</SelectItem>
+                            <SelectItem value="Partiellement remboursé">Partiellement remboursé</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+            <DialogFooter>
+                <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
+                <Button onClick={handleDepositSave}>Enregistrer</Button>
+            </DialogFooter>
+        </DialogContent>
       </Dialog>
 
       <Dialog open={isCameraOpen} onOpenChange={setIsCameraOpen}>
