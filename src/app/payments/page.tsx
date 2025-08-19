@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle, Printer, Loader2 } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Printer, Loader2, Mail } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +50,7 @@ type Payment = {
   tenant: string;
   tenantId: string;
   phone: string;
+  email: string;
   property: string;
   date: string;
   amount: number;
@@ -61,6 +62,7 @@ type Tenant = {
   id: string;
   name: string;
   phone: string;
+  email: string;
   property: string;
 };
 
@@ -132,6 +134,7 @@ export default function PaymentsPage() {
         tenant: tenant.name,
         tenantId: tenant.id,
         phone: tenant.phone,
+        email: tenant.email,
         property: tenant.property,
         date: newPayment.date,
         amount: parseFloat(newPayment.amount),
@@ -153,38 +156,72 @@ export default function PaymentsPage() {
     }
   };
 
+  const getReceiptText = (payment: Payment) => {
+    return `Bonjour ${payment.tenant},\n\nVoici votre reçu pour le loyer de ${payment.period}.\n\n- Montant : ${payment.amount.toFixed(2)} €\n- Date de paiement : ${payment.date}\n- Propriété : ${payment.property}\n\nCordialement.`;
+  }
+
   const handleSendReceipt = (payment: Payment) => {
     if (!payment.phone) {
       toast({ variant: "destructive", title: "Erreur", description: "Numéro de téléphone du locataire manquant."});
       return;
     }
-    const receiptText = `Bonjour ${payment.tenant},\n\nVoici votre reçu pour le loyer de ${payment.period}.\n\nMontant : ${payment.amount.toFixed(2)} €\nDate de paiement : ${payment.date}\nPropriété : ${payment.property}\n\nMerci.`;
+    const receiptText = getReceiptText(payment);
     const whatsappUrl = `https://wa.me/${payment.phone.replace(/\D/g, '')}?text=${encodeURIComponent(receiptText)}`;
     window.open(whatsappUrl, '_blank');
   };
   
+  const handleEmailReceipt = (payment: Payment) => {
+    if (!payment.email) {
+      toast({ variant: "destructive", title: "Erreur", description: "Email du locataire manquant."});
+      return;
+    }
+    const subject = `Reçu de loyer pour ${payment.period}`;
+    const body = getReceiptText(payment);
+    const mailtoUrl = `mailto:${payment.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailtoUrl;
+  };
+
   const handlePrintReceipt = (payment: Payment) => {
      const receiptContent = `
       <html>
         <head>
-          <title>Reçu de Loyer</title>
+          <title>Reçu de Loyer - ${payment.period}</title>
           <style>
-            body { font-family: sans-serif; margin: 2rem; }
-            h1 { color: #333; }
-            p { margin: 0.5rem 0; }
-            .details { border: 1px solid #ccc; padding: 1rem; border-radius: 8px; margin-top: 1rem; }
+            body { font-family: Arial, sans-serif; margin: 0; padding: 2rem; color: #333; }
+            .container { border: 1px solid #eee; padding: 2rem; border-radius: 10px; max-width: 800px; margin: auto; }
+            .header { text-align: center; border-bottom: 1px solid #eee; padding-bottom: 1rem; }
+            .header h1 { margin: 0; color: #000; }
+            .header p { margin: 0; color: #555; }
+            .details { margin: 2rem 0; }
+            .details table { width: 100%; border-collapse: collapse; }
+            .details th, .details td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #eee; }
+            .details th { color: #555; font-weight: normal; }
+            .total { text-align: right; margin-top: 2rem; }
+            .total h2 { margin: 0; font-size: 1.5rem; }
+            .footer { text-align: center; margin-top: 2rem; font-size: 0.8rem; color: #777; }
           </style>
         </head>
         <body>
-          <h1>Reçu de Loyer</h1>
-          <div class="details">
-            <p><strong>Locataire :</strong> ${payment.tenant}</p>
-            <p><strong>Propriété :</strong> ${payment.property}</p>
-            <p><strong>Date de paiement :</strong> ${payment.date}</p>
-            <p><strong>Période :</strong> ${payment.period}</p>
-            <p><strong>Montant payé :</strong> ${payment.amount.toFixed(2)} €</p>
+          <div class="container">
+            <div class="header">
+              <h1>QUITTANCE DE LOYER</h1>
+              <p>Reçu pour la période de ${payment.period}</p>
+            </div>
+            <div class="details">
+              <table>
+                <tr><th>Propriétaire:</th><td>[Nom du propriétaire]</td></tr>
+                <tr><th>Locataire:</th><td>${payment.tenant}</td></tr>
+                <tr><th>Propriété louée:</th><td>${payment.property}</td></tr>
+                <tr><th>Date du paiement:</th><td>${payment.date}</td></tr>
+              </table>
+            </div>
+            <div class="total">
+              <h2>Total payé: ${payment.amount.toFixed(2)} €</h2>
+            </div>
+            <div class="footer">
+              <p>Ceci est un reçu généré automatiquement. Pour toute question, veuillez nous contacter.</p>
+            </div>
           </div>
-          <p style="margin-top: 2rem;">Merci pour votre paiement.</p>
         </body>
       </html>
     `;
@@ -253,6 +290,10 @@ export default function PaymentsPage() {
                           <DropdownMenuItem onClick={() => handleSendReceipt(payment)}>
                             <WhatsappIcon />
                             <span className="ml-2">Envoyer par WhatsApp</span>
+                          </DropdownMenuItem>
+                           <DropdownMenuItem onClick={() => handleEmailReceipt(payment)}>
+                            <Mail className="mr-2 h-4 w-4" />
+                            Envoyer par Email
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handlePrintReceipt(payment)}>
                             <Printer className="mr-2 h-4 w-4" />

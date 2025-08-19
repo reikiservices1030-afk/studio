@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle, Loader2, MessageSquare, Eye, Edit } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Loader2, MessageSquare, Eye, Edit, FileText } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,7 +55,7 @@ type Tenant = {
 };
 
 const WhatsappIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
 );
 
 
@@ -201,6 +201,55 @@ export default function TenantsPage() {
       }
     }
   }
+
+  const handleGenerateLease = (tenant: Tenant) => {
+    const leaseContent = `
+      <html>
+        <head>
+          <title>Contrat de Bail</title>
+          <style>
+            body { font-family: 'Times New Roman', serif; margin: 2rem; line-height: 1.6; }
+            h1, h2 { text-align: center; }
+            p { margin: 1rem 0; }
+            .section { margin-top: 2rem; }
+            .signature-area { margin-top: 4rem; display: flex; justify-content: space-between; }
+            .signature { width: 45%; border-top: 1px solid #000; padding-top: 0.5rem; }
+          </style>
+        </head>
+        <body>
+          <h1>CONTRAT DE BAIL RÉSIDENTIEL</h1>
+          <div class="section">
+            <h2>ENTRE LES SOUSSIGNÉS :</h2>
+            <p><strong>Le Bailleur :</strong> [Nom du propriétaire], demeurant à [Adresse du propriétaire], ci-après dénommé "le Bailleur".</p>
+            <p><strong>Le Locataire :</strong> ${tenant.name}, Numéro National : ${tenant.nationalId}, demeurant actuellement à [Adresse actuelle du locataire], ci-après dénommé "le Locataire".</p>
+          </div>
+          <div class="section">
+            <h2>IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :</h2>
+            <p>Le Bailleur loue au Locataire, qui accepte, le bien immobilier suivant :</p>
+            <p><strong>Désignation du bien :</strong> ${tenant.property}</p>
+            <p><strong>Usage du bien :</strong> Le bien est loué à usage exclusif d'habitation principale.</p>
+          </div>
+          <div class="section">
+            <h2>DURÉE DU BAIL</h2>
+            <p>Le présent bail est consenti pour une durée de [Nombre d'années] ans, à compter du [Date de début] pour se terminer le ${tenant.leaseEnd}, sauf reconduction ou résiliation anticipée dans les conditions prévues par la loi.</p>
+          </div>
+           <div class="section">
+            <h2>LOYER ET CHARGES</h2>
+            <p>Le loyer mensuel est fixé à [Montant du loyer en chiffres] € ([Montant en lettres] euros), payable par le Locataire au Bailleur avant le 5 de chaque mois.</p>
+            <p>En sus du loyer, le Locataire s'acquittera d'une provision sur charges mensuelle de [Montant des charges] €.</p>
+          </div>
+          <div class="signature-area">
+            <div class="signature">Fait à Bruxelles, le ${new Date().toLocaleDateString('fr-BE')}<br/><br/><strong>Le Bailleur</strong></div>
+            <div class="signature">Fait à Bruxelles, le ${new Date().toLocaleDateString('fr-BE')}<br/><br/><strong>Le Locataire</strong></div>
+          </div>
+        </body>
+      </html>
+    `;
+    const printWindow = window.open('', '_blank');
+    printWindow?.document.write(leaseContent);
+    printWindow?.document.close();
+    printWindow?.print();
+  }
   
   return (
     <div className="flex flex-col h-full">
@@ -269,6 +318,10 @@ export default function TenantsPage() {
                           <DropdownMenuItem onClick={() => openEditDialog(tenant)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Modifier
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleGenerateLease(tenant)}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Générer le bail
                           </DropdownMenuItem>
                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteTenant(tenant.id)}>Supprimer</DropdownMenuItem>
                         </DropdownMenuContent>
