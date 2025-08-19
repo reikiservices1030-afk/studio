@@ -4,6 +4,7 @@
 
 
 
+
 export type OwnerInfo = {
   name: string;
   address: string;

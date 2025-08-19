@@ -138,20 +138,11 @@ export default function PaymentsPage() {
 
   const groupedPayments = useMemo((): GroupedPayment[] => {
     const groups: { [key: string]: GroupedPayment } = {};
-    if (tenants.length === 0) return [];
 
     payments.forEach(p => {
         const groupKey = `${p.tenantId}-${p.type}-${p.period}`;
-        const tenant = tenants.find(t => t.id === p.tenantId);
         
         if (!groups[groupKey]) {
-            let totalDue = 0;
-            if (p.type === 'Loyer') {
-                totalDue = tenant?.rent || 0;
-            } else if (p.type === 'Caution') {
-                totalDue = tenant?.depositAmount || 0;
-            }
-
             groups[groupKey] = {
                 groupKey,
                 tenantId: p.tenantId,
@@ -160,7 +151,7 @@ export default function PaymentsPage() {
                 property: p.property,
                 type: p.type,
                 period: p.period,
-                totalDue: totalDue,
+                totalDue: p.rentDue || 0,
                 totalPaid: 0,
                 status: '',
                 payments: [],
