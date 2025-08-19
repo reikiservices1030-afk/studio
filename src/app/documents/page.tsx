@@ -100,7 +100,7 @@ export default function DocumentsPage() {
 
                 toast({ title: "Succès", description: "Document téléchargé." });
             } catch (error: any) {
-                if (error.code === 'storage/unauthorized' || error.name === 'FirebaseError' && error.message.includes('CORS')) {
+                if (error.code === 'storage/unauthorized' || (error.name === 'FirebaseError' && error.message.includes('CORS'))) {
                     setCorsError(true);
                 } else {
                     toast({ variant: "destructive", title: "Erreur", description: "Impossible de télécharger le document." });

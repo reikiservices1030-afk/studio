@@ -91,7 +91,8 @@ export default function PaymentsPage() {
         const month = monthDate.toLocaleString('fr-BE', { month: 'long' });
         const year = monthDate.getFullYear();
         if (month) {
-          periods.add(`${month.charAt(0).toUpperCase() + month.slice(1)} ${year}`);
+          const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
+          periods.add(`${capitalizedMonth} ${year}`);
         }
     }
     return Array.from(periods);
@@ -137,11 +138,13 @@ export default function PaymentsPage() {
 
   const groupedPayments = useMemo((): GroupedPayment[] => {
     const groups: { [key: string]: GroupedPayment } = {};
+    if (tenants.length === 0) return [];
 
     payments.forEach(p => {
         const groupKey = `${p.tenantId}-${p.type}-${p.period}`;
+        const tenant = tenants.find(t => t.id === p.tenantId);
+        
         if (!groups[groupKey]) {
-            const tenant = tenants.find(t => t.id === p.tenantId);
             let totalDue = 0;
             if (p.type === 'Loyer') {
                 totalDue = tenant?.rent || 0;
@@ -192,7 +195,7 @@ export default function PaymentsPage() {
         amount: 0,
         status: "Payé",
         type: "Loyer",
-        period: `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
+        period: recentPeriods[0] || `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
     });
   };
 
@@ -252,21 +255,21 @@ export default function PaymentsPage() {
         amount: 0,
         status: "Payé",
         type: 'Loyer',
-        period: `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
+        period: recentPeriods[0] || `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
     });
     setIsDialogOpen(true);
   }
 
   const getReceiptText = (group: GroupedPayment) => {
-    const balance = group.totalDue - group.totalPaid;
+    const balance = (group.totalDue || 0) - (group.totalPaid || 0);
     let balanceText = `Solde restant pour ${group.period}: ${balance.toFixed(2)} €`;
     if (balance <= 0) {
       balanceText = "Ce paiement solde la période.";
     }
 
-    let paymentsDetails = group.payments.map(p => `- ${new Date(p.date).toLocaleDateString('fr-BE')}: ${p.amount.toFixed(2)} €`).join('\n');
+    let paymentsDetails = group.payments.map(p => `- ${new Date(p.date).toLocaleDateString('fr-BE')}: ${(p.amount || 0).toFixed(2)} €`).join('\n');
 
-    return `Bonjour ${group.tenantFirstName} ${group.tenantLastName},\n\nVoici votre reçu pour le paiement de ${group.type.toLowerCase()} pour ${group.period}.\n\n- Montant total dû : ${group.totalDue.toFixed(2)} €\n- Montant total payé : ${group.totalPaid.toFixed(2)} €\n- Propriété : ${group.property}\n\nDétails des paiements:\n${paymentsDetails}\n\n${balanceText}\n\nCordialement,\n${ownerInfo?.name || ''}`;
+    return `Bonjour ${group.tenantFirstName} ${group.tenantLastName},\n\nVoici votre reçu pour le paiement de ${group.type.toLowerCase()} pour ${group.period}.\n\n- Montant total dû : ${(group.totalDue || 0).toFixed(2)} €\n- Montant total payé : ${(group.totalPaid || 0).toFixed(2)} €\n- Propriété : ${group.property}\n\nDétails des paiements:\n${paymentsDetails}\n\n${balanceText}\n\nCordialement,\n${ownerInfo?.name || ''}`;
   }
 
   const handleSendReceipt = (group: GroupedPayment) => {
@@ -293,9 +296,9 @@ export default function PaymentsPage() {
   };
 
   const getReceiptHTML = (group: GroupedPayment) => {
-    const balance = group.totalDue - group.totalPaid;
+    const balance = (group.totalDue || 0) - (group.totalPaid || 0);
     const balanceText = balance > 0 ? `<tr><th style="color: #e53e3e;">Solde restant:</th><td style="color: #e53e3e; font-weight: bold;">${balance.toFixed(2)} €</td></tr>` : '<tr><td colspan="2" style="text-align:center; font-weight:bold; color: #38a169;">Paiement complet</td></tr>';
-    const paymentsHtml = group.payments.map(p => `<tr><td>Paiement du ${new Date(p.date).toLocaleDateString('fr-BE')}</td><td>${p.amount.toFixed(2)} €</td></tr>`).join('');
+    const paymentsHtml = group.payments.map(p => `<tr><td>Paiement du ${new Date(p.date).toLocaleDateString('fr-BE')}</td><td>${(p.amount || 0).toFixed(2)} €</td></tr>`).join('');
 
     return `
       <html>
@@ -341,8 +344,8 @@ export default function PaymentsPage() {
                 ${paymentsHtml}
               </table>
               <table class="total">
-                <tr><th>Total dû:</th><td>${group.totalDue.toFixed(2)} €</td></tr>
-                <tr><th>Total payé:</th><td style="color: #38a169; font-weight: bold;">${group.totalPaid.toFixed(2)} €</td></tr>
+                <tr><th>Total dû:</th><td>${(group.totalDue || 0).toFixed(2)} €</td></tr>
+                <tr><th>Total payé:</th><td style="color: #38a169; font-weight: bold;">${(group.totalPaid || 0).toFixed(2)} €</td></tr>
                 ${balanceText}
               </table>
             </div>
@@ -392,8 +395,8 @@ export default function PaymentsPage() {
     const existingGroup = groupedPayments.find(g => g.groupKey === groupKey);
 
     if (existingGroup && existingGroup.status !== 'Payé') {
-      const remainingAmount = existingGroup.totalDue - existingGroup.totalPaid;
-      setCurrentPayment({ ...currentPayment, period: period, amount: remainingAmount });
+      const remainingAmount = (existingGroup.totalDue || 0) - (existingGroup.totalPaid || 0);
+      setCurrentPayment({ ...currentPayment, period: period, amount: remainingAmount > 0 ? remainingAmount : 0 });
     } else {
       const tenant = tenants.find(t => t.id === currentPayment.tenantId);
       setCurrentPayment({ ...currentPayment, period: period, amount: tenant?.rent || 0 });
@@ -446,7 +449,7 @@ export default function PaymentsPage() {
                         <div className="text-sm text-muted-foreground">{group.period}</div>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-right">
-                        <div className="font-medium">{group.totalPaid.toFixed(2)} € / {group.totalDue ? group.totalDue.toFixed(2) : '0.00'} €</div>
+                        <div className="font-medium">{(group.totalPaid || 0).toFixed(2)} € / {(group.totalDue || 0).toFixed(2)} €</div>
                         <div className="text-sm text-muted-foreground">
                             {group.payments.length} versement(s)
                         </div>
@@ -482,7 +485,7 @@ export default function PaymentsPage() {
                            {group.payments.map(p => (
                              <DropdownMenuItem key={p.id} onClick={() => openEditDialog(p)}>
                                 <Edit className="mr-2 h-4 w-4" /> 
-                                Modifier {p.amount.toFixed(2)}€ du {new Date(p.date).toLocaleDateString('fr-BE')}
+                                Modifier {(p.amount || 0).toFixed(2)}€ du {new Date(p.date).toLocaleDateString('fr-BE')}
                              </DropdownMenuItem>
                            ))}
                         </DropdownMenuContent>
@@ -512,7 +515,7 @@ export default function PaymentsPage() {
                     onValueChange={(value: 'Loyer' | 'Caution') => {
                         const tenant = tenants.find(t => t.id === currentPayment.tenantId);
                         const amount = tenant ? (value === 'Loyer' ? tenant.rent : tenant.depositAmount) : 0;
-                        const period = value === 'Loyer' ? `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}` : 'Caution';
+                        const period = value === 'Loyer' ? recentPeriods[0] : 'Caution';
                         setCurrentPayment({ ...currentPayment, type: value, amount: amount || 0, period });
                     }}
                     value={currentPayment.type}
