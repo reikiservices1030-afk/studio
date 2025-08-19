@@ -4,7 +4,7 @@
 import { Header } from '@/components/layout/Header';
 import { DashboardClient } from './dashboard-client';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, Timestamp, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import type { Payment, Property, Tenant, Reminder } from '@/types';
 
 type DashboardData = {
@@ -43,6 +43,7 @@ async function getDashboardData(): Promise<DashboardData> {
     const now = new Date();
     const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     const upcomingPaymentsCount = reminders.filter(r => {
+        if (!r.dueDate) return false;
         const dueDate = new Date(r.dueDate);
         return r.status !== 'Envoyé' && dueDate >= now && dueDate <= nextWeek;
     }).length;
@@ -63,7 +64,7 @@ async function getDashboardData(): Promise<DashboardData> {
     }
 
     payments.forEach(p => {
-        if (p.status === 'Payé') {
+        if (p.status === 'Payé' && p.date) {
             const paymentDate = new Date(p.date);
             const monthKey = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}`;
             if (monthlyRevenueMap.has(monthKey)) {
@@ -73,7 +74,7 @@ async function getDashboardData(): Promise<DashboardData> {
     });
     
     const monthlyRevenue = Array.from(monthlyRevenueMap.entries()).map(([key, revenue], index) => ({
-      month: monthLabels[index],
+      month: monthLabels[index] || 'N/A',
       revenue,
     }));
 

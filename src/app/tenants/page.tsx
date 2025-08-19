@@ -69,30 +69,8 @@ import {
 } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import type { Tenant, Property } from '@/types';
 
-type Tenant = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  nationalId: string;
-  nationality: string;
-  bankAccount: string;
-  propertyId: string;
-  propertyName: string;
-  leaseStart: string;
-  leaseDuration: number; // in months
-  status: string;
-  idCardUrl: string;
-  idCardPath: string;
-};
-
-type Property = {
-    id: string;
-    address: string;
-    rent: number;
-}
 
 const WhatsappIcon = () => (
   <svg
@@ -214,7 +192,7 @@ export default function TenantsPage() {
         context.drawImage(videoRef.current, 0, 0, videoRef.current.videoWidth, videoRef.current.videoHeight);
         canvasRef.current.toBlob(blob => {
           if (blob) {
-            const file = new File([blob], `id_card_${Date.now()}.png`, { type: 'image/png' });
+            const file = new File([blob], `id_card.png`, { type: 'image/png' });
             setIdCardFile(file);
             toast({title: "Photo capturée", description: "La photo de la carte d'identité a été prise."});
             setIsCameraOpen(false);
@@ -225,12 +203,12 @@ export default function TenantsPage() {
   };
 
   const handleSave = async () => {
-    const { firstName, lastName, email, propertyId, leaseStart, leaseDuration } = currentTenant;
-    if (!firstName || !lastName || !email || !propertyId || !leaseStart || !leaseDuration) {
+    const { firstName, lastName, email, propertyId, leaseStart, leaseDuration, nationalId } = currentTenant;
+    if (!firstName || !lastName || !email || !propertyId || !leaseStart || !leaseDuration || !nationalId) {
       toast({
         variant: 'destructive',
         title: 'Erreur',
-        description: 'Veuillez remplir tous les champs obligatoires.',
+        description: 'Veuillez remplir tous les champs obligatoires (y compris le N° National).',
       });
       return;
     }
@@ -245,7 +223,8 @@ export default function TenantsPage() {
                 const oldImageRef = ref(storage, currentTenant.idCardPath);
                 await deleteObject(oldImageRef).catch(err => console.error("Could not delete old image", err));
             }
-            const newImagePath = `id_cards/${Date.now()}_${idCardFile.name}`;
+            const fileExtension = idCardFile.name.split('.').pop();
+            const newImagePath = `id_cards/${nationalId}.${fileExtension}`;
             const storageRef = ref(storage, newImagePath);
             await uploadBytes(storageRef, idCardFile);
             idCardUrl = await getDownloadURL(storageRef);
@@ -254,7 +233,7 @@ export default function TenantsPage() {
 
         const selectedProperty = properties.find(p => p.id === propertyId);
 
-        const tenantData = {
+        const tenantData: Omit<Tenant, 'id'> = {
             firstName: currentTenant.firstName || '',
             lastName: currentTenant.lastName || '',
             email: currentTenant.email || '',
@@ -297,7 +276,8 @@ export default function TenantsPage() {
         }
         await deleteDoc(doc(db, 'tenants', tenant.id));
         toast({ title: 'Succès', description: 'Locataire supprimé.' });
-      } catch (error) {
+      } catch (error)
+        {
         console.error('Error deleting tenant:', error);
         toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer le locataire.' });
       }
@@ -470,6 +450,7 @@ export default function TenantsPage() {
                     <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
                 </div>
                 {idCardFile && <p className="text-sm text-muted-foreground">Fichier sélectionné: {idCardFile.name}</p>}
+                {!idCardFile && currentTenant.idCardUrl && <p className="text-sm text-muted-foreground">Une image est déjà enregistrée.</p>}
             </div>
           </div>
           <DialogFooter>
@@ -485,16 +466,16 @@ export default function TenantsPage() {
               {currentTenant && (
                   <div className="grid gap-4 py-4 text-sm max-h-[60vh] overflow-y-auto pr-4">
                       {currentTenant.idCardUrl && <Image src={currentTenant.idCardUrl} alt="ID Card" width={400} height={250} className="rounded-md object-contain mx-auto" />}
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Nom:</p><div className="col-span-2 font-medium">{currentTenant.firstName} {currentTenant.lastName}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Email:</p><div className="col-span-2 font-medium">{currentTenant.email}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Téléphone:</p><div className="col-span-2 font-medium">{currentTenant.phone}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">N° National:</p><div className="col-span-2 font-medium">{currentTenant.nationalId}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Nationalité:</p><div className="col-span-2 font-medium">{currentTenant.nationality}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Compte bancaire:</p><div className="col-span-2 font-medium">{currentTenant.bankAccount}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Propriété:</p><div className="col-span-2 font-medium">{currentTenant.propertyName}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Début du bail:</p><div className="col-span-2 font-medium">{currentTenant.leaseStart}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Durée:</p><div className="col-span-2 font-medium">{currentTenant.leaseDuration} mois</div></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Statut:</p><div className="col-span-2 font-medium"><Badge variant={currentTenant.status === 'Actif' ? 'secondary' : 'destructive'}>{currentTenant.status}</Badge></div></div>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Nom:</div><div className="col-span-2 font-medium">{currentTenant.firstName} {currentTenant.lastName}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Email:</div><div className="col-span-2 font-medium">{currentTenant.email}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Téléphone:</div><div className="col-span-2 font-medium">{currentTenant.phone}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">N° National:</div><div className="col-span-2 font-medium">{currentTenant.nationalId}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Nationalité:</div><div className="col-span-2 font-medium">{currentTenant.nationality}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Compte bancaire:</div><div className="col-span-2 font-medium">{currentTenant.bankAccount}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Propriété:</div><div className="col-span-2 font-medium">{currentTenant.propertyName}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Début du bail:</div><div className="col-span-2 font-medium">{currentTenant.leaseStart}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Durée:</div><div className="col-span-2 font-medium">{currentTenant.leaseDuration} mois</div></div>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Statut:</div><div className="col-span-2 font-medium"><Badge variant={currentTenant.status === 'Actif' ? 'secondary' : 'destructive'}>{currentTenant.status}</Badge></div></div>
                   </div>
               )}
               <DialogFooter><DialogClose asChild><Button variant="outline">Fermer</Button></DialogClose></DialogFooter>
