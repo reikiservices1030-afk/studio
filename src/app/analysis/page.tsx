@@ -6,7 +6,7 @@ import { analyzeRentalMarket } from '@/ai/flows/analyze-rental-market';
 import { Header } from '@/components/layout/Header';
 import { AnalysisClient } from './analysis-client';
 
-export async function runAnalysis(data: AnalyzeRentalMarketInput) {
+async function runAnalysis(data: AnalyzeRentalMarketInput) {
   try {
     const result = await analyzeRentalMarket(data);
     return { success: true, data: result };

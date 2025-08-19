@@ -99,7 +99,7 @@ const WhatsappIcon = () => (
     xmlns="http://www.w3.org/2000/svg"
     width="24"
     height="24"
-    viewBox="0 0 24"
+    viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
     strokeWidth="2"
@@ -485,16 +485,16 @@ export default function TenantsPage() {
               {currentTenant && (
                   <div className="grid gap-4 py-4 text-sm max-h-[60vh] overflow-y-auto pr-4">
                       {currentTenant.idCardUrl && <Image src={currentTenant.idCardUrl} alt="ID Card" width={400} height={250} className="rounded-md object-contain mx-auto" />}
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Nom:</p><p className="col-span-2 font-medium">{currentTenant.firstName} {currentTenant.lastName}</p></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Email:</p><p className="col-span-2 font-medium">{currentTenant.email}</p></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Téléphone:</p><p className="col-span-2 font-medium">{currentTenant.phone}</p></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">N° National:</p><p className="col-span-2 font-medium">{currentTenant.nationalId}</p></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Nationalité:</p><p className="col-span-2 font-medium">{currentTenant.nationality}</p></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Compte bancaire:</p><p className="col-span-2 font-medium">{currentTenant.bankAccount}</p></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Propriété:</p><p className="col-span-2 font-medium">{currentTenant.propertyName}</p></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Début du bail:</p><p className="col-span-2 font-medium">{currentTenant.leaseStart}</p></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Durée:</p><p className="col-span-2 font-medium">{currentTenant.leaseDuration} mois</p></div>
-                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Statut:</p><p className="col-span-2 font-medium"><Badge variant={currentTenant.status === 'Actif' ? 'secondary' : 'destructive'}>{currentTenant.status}</Badge></p></div>
+                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Nom:</p><div className="col-span-2 font-medium">{currentTenant.firstName} {currentTenant.lastName}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Email:</p><div className="col-span-2 font-medium">{currentTenant.email}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Téléphone:</p><div className="col-span-2 font-medium">{currentTenant.phone}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">N° National:</p><div className="col-span-2 font-medium">{currentTenant.nationalId}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Nationalité:</p><div className="col-span-2 font-medium">{currentTenant.nationality}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Compte bancaire:</p><div className="col-span-2 font-medium">{currentTenant.bankAccount}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Propriété:</p><div className="col-span-2 font-medium">{currentTenant.propertyName}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Début du bail:</p><div className="col-span-2 font-medium">{currentTenant.leaseStart}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Durée:</p><div className="col-span-2 font-medium">{currentTenant.leaseDuration} mois</div></div>
+                      <div className="grid grid-cols-3 gap-2"><p className="text-muted-foreground">Statut:</p><div className="col-span-2 font-medium"><Badge variant={currentTenant.status === 'Actif' ? 'secondary' : 'destructive'}>{currentTenant.status}</Badge></div></div>
                   </div>
               )}
               <DialogFooter><DialogClose asChild><Button variant="outline">Fermer</Button></DialogClose></DialogFooter>
