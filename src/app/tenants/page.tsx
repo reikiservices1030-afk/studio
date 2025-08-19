@@ -547,7 +547,7 @@ export default function TenantsPage() {
 
             <div class="section">
               <h2>Article 3 : Garantie locative</h2>
-              <p>Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer de base, soit <strong>${(tenant.depositAmount || 0).toFixed(2)} €</strong>. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.</p>
+              <p>Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer, soit <strong>${(tenant.depositAmount || 0).toFixed(2)} €</strong>. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.</p>
             </div>
 
             <div class="section signatures">
@@ -699,7 +699,7 @@ export default function TenantsPage() {
           Ajouter un locataire
         </Button>
       </Header>
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <Card>
           <CardHeader>
             <CardTitle className="font-headline">Gestion des locataires</CardTitle>
@@ -759,8 +759,8 @@ export default function TenantsPage() {
             <DialogTitle>{isEditing ? 'Modifier le locataire' : 'Ajouter un locataire'}</DialogTitle>
             <DialogDescription>Remplissez les informations du locataire ci-dessous.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2"><Label>Prénom</Label><Input value={currentTenant.firstName || ''} onChange={(e) => setCurrentTenant({...currentTenant, firstName: e.target.value})} /></div>
                 <div className="space-y-2"><Label>Nom</Label><Input value={currentTenant.lastName || ''} onChange={(e) => setCurrentTenant({...currentTenant, lastName: e.target.value})} /></div>
             </div>
@@ -776,7 +776,7 @@ export default function TenantsPage() {
             </div>
             <div className="space-y-2"><Label>Email</Label><Input type="email" value={currentTenant.email || ''} onChange={(e) => setCurrentTenant({...currentTenant, email: e.target.value})} /></div>
             <div className="space-y-2"><Label>Téléphone</Label><Input type="tel" value={currentTenant.phone || ''} onChange={(e) => setCurrentTenant({...currentTenant, phone: e.target.value})} /></div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2"><Label>N° National</Label><Input value={currentTenant.nationalId || ''} onChange={(e) => setCurrentTenant({...currentTenant, nationalId: e.target.value})} /></div>
                 <div className="space-y-2"><Label>Nationalité</Label><Input value={currentTenant.nationality || ''} onChange={(e) => setCurrentTenant({...currentTenant, nationality: e.target.value})} /></div>
             </div>
@@ -799,7 +799,7 @@ export default function TenantsPage() {
                     <Input value={currentTenant.depositAmount ? `${currentTenant.depositAmount.toFixed(2)} €` : '0.00 €'} disabled />
                 </div>
             )}
-             <div className="grid grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2"><Label>Date de début du bail</Label><Input type="date" value={currentTenant.leaseStart || ''} onChange={(e) => setCurrentTenant({...currentTenant, leaseStart: e.target.value})} /></div>
                 <div className="space-y-2"><Label>Durée du bail (mois)</Label><Input type="number" value={currentTenant.leaseDuration || ''} onChange={(e) => setCurrentTenant({...currentTenant, leaseDuration: Number(e.target.value)})} /></div>
             </div>

@@ -137,11 +137,11 @@ export default function DocumentsPage() {
       <Header title="Documents">
         <Button size="sm" className="gap-1" onClick={handleUploadClick} disabled={uploading || corsError}>
           {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <Upload className="h-3.5 w-3.5" />}
-          {uploading ? 'Téléchargement...' : 'Télécharger un document'}
+          {uploading ? 'Téléchargement...' : 'Télécharger'}
         </Button>
         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
       </Header>
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         {corsError && (
              <Alert variant="destructive" className="mb-4">
               <AlertTriangle className="h-4 w-4" />
@@ -182,7 +182,7 @@ export default function DocumentsPage() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         {getFileIcon(doc.name)}
-                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">{doc.name}</a>
+                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline truncate max-w-xs">{doc.name}</a>
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{doc.type}</TableCell>

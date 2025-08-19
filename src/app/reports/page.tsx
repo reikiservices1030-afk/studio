@@ -13,7 +13,7 @@ export default function ReportsPage() {
           Télécharger les rapports
         </Button>
       </Header>
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
         <ReportsClient />
       </div>
     </div>

@@ -195,7 +195,7 @@ export default function MaintenancePage() {
                     Ajouter une dépense
                 </Button>
             </Header>
-            <div className="flex-1 overflow-y-auto p-4 md:p-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                 <Card>
                     <CardHeader>
                         <CardTitle className="font-headline">Suivi des frais de maintenance</CardTitle>
@@ -267,7 +267,7 @@ export default function MaintenancePage() {
                     <DialogHeader>
                         <DialogTitle>{isEditing ? 'Modifier la dépense' : 'Ajouter une dépense'}</DialogTitle>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
+                    <div className="space-y-4 py-4">
                         <div className="space-y-2">
                             <Label>Propriété</Label>
                             <Select value={currentMaintenance.propertyId} onValueChange={(value) => setCurrentMaintenance({ ...currentMaintenance, propertyId: value, tenantId: undefined })}>

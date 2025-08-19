@@ -192,7 +192,7 @@ export default function PropertiesPage() {
           Ajouter une propriété
         </Button>
       </Header>
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <Card>
           <CardHeader>
             <CardTitle className="font-headline">
@@ -266,7 +266,7 @@ export default function PropertiesPage() {
               Remplissez les détails de la propriété ci-dessous.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="address">Adresse</Label>
               <Input

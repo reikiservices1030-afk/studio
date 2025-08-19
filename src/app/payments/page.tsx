@@ -463,7 +463,7 @@ export default function PaymentsPage() {
           Ajouter un paiement
         </Button>
       </Header>
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <Card>
           <CardHeader>
             <CardTitle className="font-headline">Historique des paiements</CardTitle>
@@ -560,9 +560,9 @@ export default function PaymentsPage() {
               {isEditing ? 'Mettez à jour les détails de ce paiement.' : 'Enregistrez un nouveau paiement.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="type" className="text-right">Type</Label>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+                <Label>Type</Label>
                 <Select
                     onValueChange={(value: 'Loyer' | 'Caution') => {
                         const tenant = tenants.find(t => t.id === currentPayment.tenantId);
@@ -576,21 +576,21 @@ export default function PaymentsPage() {
                     value={currentPayment.type}
                     disabled={!isEditing && false}
                 >
-                    <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="Loyer">Loyer</SelectItem>
                         <SelectItem value="Caution">Caution</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
-             <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="tenant" className="text-right">Locataire</Label>
+             <div className="space-y-2">
+                <Label>Locataire</Label>
                 <Select 
                     onValueChange={handleTenantChange}
                     value={currentPayment.tenantId}
                     disabled={!isEditing && false}
                 >
-                    <SelectTrigger className="col-span-3">
+                    <SelectTrigger>
                         <SelectValue placeholder="Sélectionnez un locataire" />
                     </SelectTrigger>
                     <SelectContent>
@@ -600,14 +600,14 @@ export default function PaymentsPage() {
                     </SelectContent>
                 </Select>
             </div>
-            {currentPayment.type === 'Loyer' && <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="period" className="text-right">Période</Label>
+            {currentPayment.type === 'Loyer' && <div className="space-y-2">
+              <Label>Période</Label>
                <Select
                   onValueChange={handlePeriodChange}
                   value={currentPayment.period}
                    disabled={!isEditing && false}
                 >
-                  <SelectTrigger className="col-span-3">
+                  <SelectTrigger>
                     <SelectValue placeholder="Sélectionnez une période" />
                   </SelectTrigger>
                   <SelectContent>
@@ -615,13 +615,13 @@ export default function PaymentsPage() {
                   </SelectContent>
                 </Select>
             </div>}
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="amount" className="text-right">Montant (€)</Label>
-              <Input id="amount" type="number" value={currentPayment.amount || ''} onChange={(e) => setCurrentPayment({...currentPayment, amount: Number(e.target.value)})} className="col-span-3" />
+             <div className="space-y-2">
+              <Label>Montant (€)</Label>
+              <Input id="amount" type="number" value={currentPayment.amount || ''} onChange={(e) => setCurrentPayment({...currentPayment, amount: Number(e.target.value)})}/>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="date" className="text-right">Date</Label>
-              <Input id="date" type="date" value={currentPayment.date || ''} onChange={(e) => setCurrentPayment({...currentPayment, date: e.target.value})} className="col-span-3" />
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input id="date" type="date" value={currentPayment.date || ''} onChange={(e) => setCurrentPayment({...currentPayment, date: e.target.value})}/>
             </div>
           </div>
           <DialogFooter>

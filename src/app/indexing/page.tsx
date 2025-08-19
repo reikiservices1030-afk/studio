@@ -50,7 +50,7 @@ export default function IndexingPage() {
   return (
     <div className="flex flex-col h-full">
       <Header title="Indexation des loyers" />
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="grid gap-6 lg:grid-cols-2 max-w-4xl mx-auto">
           <Card>
             <CardHeader>

@@ -97,7 +97,7 @@ export default function SettingsPage() {
             {saving ? 'Enregistrement...' : 'Enregistrer les modifications'}
         </Button>
       </Header>
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <Card className="max-w-3xl mx-auto">
           <CardHeader>
             <CardTitle className="font-headline">Informations du Propriétaire</CardTitle>
