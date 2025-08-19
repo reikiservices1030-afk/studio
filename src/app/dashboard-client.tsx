@@ -28,7 +28,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import {
-  DollarSign,
+  Euro,
   Users,
   ArrowUp,
   Clock,
@@ -52,30 +52,30 @@ const monthlyRevenue = [
 const recentActivity = [
   {
     id: 1,
-    tenant: 'John Doe',
+    tenant: 'Lucas Dubois',
     activity: 'Loyer payé',
     amount: 1200,
     status: 'Terminé',
   },
   {
     id: 2,
-    tenant: 'Jane Smith',
+    tenant: 'Chloé Lambert',
     activity: 'Demande de maintenance',
     amount: null,
     status: 'En attente',
   },
   {
     id: 3,
-    tenant: 'Mike Johnson',
+    tenant: 'Thomas Martin',
     activity: 'Bail signé',
     amount: null,
     status: 'Terminé',
   },
   {
     id: 4,
-    tenant: 'Sarah Williams',
+    tenant: 'Léa Bernard',
     activity: 'Loyer en retard',
-    amount: 1500,
+    amount: 950,
     status: 'En retard',
   },
 ];
@@ -89,10 +89,10 @@ export function DashboardClient() {
             <CardTitle className="text-sm font-medium">
               Loyer total perçu
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <Euro className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$45,231.89</div>
+            <div className="text-2xl font-bold">45,231.89 €</div>
             <p className="text-xs text-muted-foreground flex items-center">
               <ArrowUp className="h-3 w-3 text-green-500 mr-1" />
               +20.1% depuis le mois dernier
@@ -160,7 +160,7 @@ export function DashboardClient() {
                   <YAxis
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(value) => `$${value / 1000}k`}
+                    tickFormatter={(value) => `${value / 1000}k €`}
                   />
                   <ChartTooltip
                     content={<ChartTooltipContent indicator="dot" />}
@@ -170,6 +170,7 @@ export function DashboardClient() {
                     dataKey="revenue"
                     fill="var(--color-primary)"
                     radius={[4, 4, 0, 0]}
+                    name="Revenu"
                   />
                 </BarChart>
               </ResponsiveContainer>

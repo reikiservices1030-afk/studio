@@ -25,7 +25,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { Bot, Loader2, DollarSign, BarChart, Home } from 'lucide-react';
+import { Bot, Loader2, Euro, BarChart, Home } from 'lucide-react';
 
 const formSchema = z.object({
   propertyType: z.string().min(1, 'Le type de propriété est requis'),
@@ -53,11 +53,11 @@ export function AnalysisClient({ runAnalysis }: AnalysisClientProps) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       propertyType: 'Appartement',
-      location: 'Paris, France',
+      location: 'Bruxelles, Belgique',
       bedrooms: 2,
       bathrooms: 1,
-      squareFootage: 80,
-      amenities: 'Lave-linge, parking, salle de sport',
+      squareFootage: 85,
+      amenities: 'Balcon, cave, parking',
     },
   });
 
@@ -100,7 +100,7 @@ export function AnalysisClient({ runAnalysis }: AnalysisClientProps) {
                     <FormItem>
                       <FormLabel>Localisation</FormLabel>
                       <FormControl>
-                        <Input placeholder="ex: Paris, France" {...field} />
+                        <Input placeholder="ex: Bruxelles, Belgique" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -167,7 +167,7 @@ export function AnalysisClient({ runAnalysis }: AnalysisClientProps) {
                     <FormItem>
                       <FormLabel>Commodités clés</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="ex: Lave-linge, parking, salle de sport" {...field} />
+                        <Textarea placeholder="ex: Balcon, cave, parking" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -218,11 +218,11 @@ export function AnalysisClient({ runAnalysis }: AnalysisClientProps) {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Loyer mensuel estimé</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    <Euro className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold text-primary">
-                      ${result.estimatedRent.toLocaleString()}
+                      {result.estimatedRent.toLocaleString('fr-BE')} €
                     </div>
                   </CardContent>
                 </Card>

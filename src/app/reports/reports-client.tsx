@@ -21,13 +21,10 @@ import {
   Area,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
-import { DollarSign, TrendingUp, TrendingDown, Landmark } from "lucide-react";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Euro, TrendingUp, TrendingDown, Landmark } from "lucide-react";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 
 const financialData = [
   { month: "Jan", income: 4000, expenses: 2400 },
@@ -40,10 +37,10 @@ const financialData = [
 
 const transactions = [
     {id: 1, date: "2024-07-25", description: "Réparation plomberie - Appt 101", type: "Dépense", amount: 250},
-    {id: 2, date: "2024-07-20", description: "Loyer - Jane Smith", type: "Revenu", amount: 1500},
-    {id: 3, date: "2024-07-18", description: "Services d'aménagement paysager", type: "Dépense", amount: 300},
-    {id: 4, date: "2024-07-15", description: "Loyer - John Doe", type: "Revenu", amount: 1200},
-    {id: 5, date: "2024-07-10", description: "Assurance habitation", type: "Dépense", amount: 450},
+    {id: 2, date: "2024-07-20", description: "Loyer - Chloé Lambert", type: "Revenu", amount: 950},
+    {id: 3, date: "2024-07-18", description: "Services de jardinage", type: "Dépense", amount: 150},
+    {id: 4, date: "2024-07-15", description: "Loyer - Lucas Dubois", type: "Revenu", amount: 1200},
+    {id: 5, date: "2024-07-10", description: "Assurance incendie", type: "Dépense", amount: 450},
 ];
 
 export function ReportsClient() {
@@ -56,7 +53,7 @@ export function ReportsClient() {
                         <TrendingUp className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">$125,430.50</div>
+                        <div className="text-2xl font-bold">125,430.50 €</div>
                         <p className="text-xs text-muted-foreground">Depuis le début de l'année</p>
                     </CardContent>
                 </Card>
@@ -66,7 +63,7 @@ export function ReportsClient() {
                         <TrendingDown className="h-4 w-4 text-red-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">$60,120.90</div>
+                        <div className="text-2xl font-bold">60,120.90 €</div>
                         <p className="text-xs text-muted-foreground">Depuis le début de l'année</p>
                     </CardContent>
                 </Card>
@@ -76,14 +73,14 @@ export function ReportsClient() {
                         <Landmark className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">$65,309.60</div>
+                        <div className="text-2xl font-bold">65,309.60 €</div>
                         <p className="text-xs text-muted-foreground">Depuis le début de l'année</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Marge bénéficiaire</CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <Euro className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">52.1%</div>
@@ -100,26 +97,28 @@ export function ReportsClient() {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <ChartContainer config={{}} className="h-[350px] w-full">
+                <ChartContainer config={{
+                  income: { label: "Revenus", color: "hsl(var(--chart-2))" },
+                  expenses: { label: "Dépenses", color: "hsl(var(--chart-1))" },
+                }} className="h-[350px] w-full">
                 <ResponsiveContainer>
                     <AreaChart data={financialData}>
                     <defs>
                         <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="var(--color-income)" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="var(--color-income)" stopOpacity={0}/>
                         </linearGradient>
                         <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="var(--color-expenses)" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="var(--color-expenses)" stopOpacity={0}/>
                         </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="month" tickLine={false} axisLine={false}/>
-                    <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `$${value/1000}k`} />
-                    <ChartTooltip content={<ChartTooltipContent indicator="dot" />} />
-                    <Legend />
-                    <Area type="monotone" dataKey="income" name="Revenus" stroke="hsl(var(--accent))" fillOpacity={1} fill="url(#colorIncome)" />
-                    <Area type="monotone" dataKey="expenses" name="Dépenses" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorExpenses)" />
+                    <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `${value/1000}k €`} />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Area type="monotone" dataKey="income" name="Revenus" stroke="var(--color-income)" fillOpacity={1} fill="url(#colorIncome)" />
+                    <Area type="monotone" dataKey="expenses" name="Dépenses" stroke="var(--color-expenses)" fillOpacity={1} fill="url(#colorExpenses)" />
                     </AreaChart>
                 </ResponsiveContainer>
                 </ChartContainer>
@@ -148,7 +147,7 @@ export function ReportsClient() {
                                         <Badge variant={tx.type === 'Revenu' ? 'default' : 'secondary'} className={tx.type === 'Revenu' ? 'bg-green-500/20 text-green-700 border-green-500/20' : 'bg-red-500/20 text-red-700 border-red-500/20'}>{tx.type}</Badge>
                                     </TableCell>
                                     <TableCell className={`text-right font-semibold ${tx.type === 'Revenu' ? 'text-green-600' : 'text-red-600'}`}>
-                                        {tx.type === 'Dépense' ? '-' : ''}${tx.amount.toFixed(2)}
+                                        {tx.type === 'Dépense' ? '-' : ''}{tx.amount.toFixed(2)} €
                                     </TableCell>
                                 </TableRow>
                             ))}

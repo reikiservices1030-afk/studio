@@ -20,7 +20,7 @@ import {
   Bell,
   LogOut,
   Settings,
-  Receipt,
+  Euro,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -29,7 +29,7 @@ const AppSidebar = () => {
   const navItems = [
     { href: '/', label: 'Tableau de bord', icon: LayoutDashboard },
     { href: '/tenants', label: 'Locataires', icon: Users },
-    { href: '/payments', label: 'Paiements', icon: Receipt },
+    { href: '/payments', label: 'Paiements', icon: Euro },
     { href: '/documents', label: 'Documents', icon: FileText },
     { href: '/reports', label: 'Rapports', icon: BarChart3 },
     { href: '/analysis', label: 'Analyse du marché', icon: Bot },
