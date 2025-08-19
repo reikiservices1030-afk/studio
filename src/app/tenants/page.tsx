@@ -567,14 +567,17 @@ export default function TenantsPage() {
             <div className="space-y-2"><Label>N° Compte Bancaire</Label><Input value={currentTenant.bankAccount || ''} onChange={(e) => setCurrentTenant({...currentTenant, bankAccount: e.target.value})} /></div>
             <div className="space-y-2">
                 <Label>Propriété à louer</Label>
-                <Select value={currentTenant.propertyId} onValueChange={(value) => {
-                    const selectedProperty = properties.find(p => p.id === value);
+                <Select
+                  value={currentTenant.propertyId}
+                  onValueChange={(value) => {
+                    const selectedProperty = properties.find((p) => p.id === value);
                     setCurrentTenant({
-                        ...currentTenant,
-                        propertyId: value,
-                        depositAmount: selectedProperty ? selectedProperty.rent * 2 : 0,
+                      ...currentTenant,
+                      propertyId: value,
+                      depositAmount: selectedProperty ? selectedProperty.rent * 2 : 0,
                     });
-                }}>
+                  }}
+                >
                     <SelectTrigger><SelectValue placeholder="Sélectionnez une propriété" /></SelectTrigger>
                     <SelectContent>
                         {properties.map(p => (<SelectItem key={p.id} value={p.id}>{p.address} - {p.rent}€</SelectItem>))}
@@ -626,13 +629,13 @@ export default function TenantsPage() {
                       
                       <div className="space-y-2">
                         <h4 className="font-semibold">Informations Personnelles</h4>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                            <div className="text-muted-foreground">Nom</div><div className="font-medium">{currentTenant.firstName} {currentTenant.lastName}</div>
-                            <div className="text-muted-foreground">Email</div><div className="font-medium">{currentTenant.email}</div>
-                            <div className="text-muted-foreground">Téléphone</div><div className="font-medium">{currentTenant.phone}</div>
-                            <div className="text-muted-foreground">N° National</div><div className="font-medium">{currentTenant.nationalId}</div>
-                            <div className="text-muted-foreground">Nationalité</div><div className="font-medium">{currentTenant.nationality}</div>
-                            <div className="text-muted-foreground">Compte bancaire</div><div className="font-medium">{currentTenant.bankAccount}</div>
+                        <div className="grid grid-cols-[120px_1fr] gap-x-4 gap-y-2">
+                          <div className="text-muted-foreground">Nom</div><div className="font-medium">{currentTenant.firstName} {currentTenant.lastName}</div>
+                          <div className="text-muted-foreground">Email</div><div className="font-medium">{currentTenant.email}</div>
+                          <div className="text-muted-foreground">Téléphone</div><div className="font-medium">{currentTenant.phone}</div>
+                          <div className="text-muted-foreground">N° National</div><div className="font-medium">{currentTenant.nationalId}</div>
+                          <div className="text-muted-foreground">Nationalité</div><div className="font-medium">{currentTenant.nationality}</div>
+                          <div className="text-muted-foreground">Compte bancaire</div><div className="font-medium">{currentTenant.bankAccount}</div>
                         </div>
                       </div>
 
@@ -640,13 +643,13 @@ export default function TenantsPage() {
 
                       <div className="space-y-2">
                         <h4 className="font-semibold">Informations sur le Bail</h4>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                            <div className="text-muted-foreground">Propriété</div><div className="font-medium">{currentTenant.propertyName}</div>
-                            <div className="text-muted-foreground">Loyer</div><div className="font-medium">{currentTenant.rent?.toFixed(2)} €</div>
-                            <div className="text-muted-foreground">Paiement le</div><div className="font-medium">{currentTenant.paymentDueDay} du mois</div>
-                            <div className="text-muted-foreground">Début du bail</div><div className="font-medium">{currentTenant.leaseStart}</div>
-                            <div className="text-muted-foreground">Durée</div><div className="font-medium">{currentTenant.leaseDuration} mois</div>
-                            <div className="text-muted-foreground">Statut</div><div><Badge variant={currentTenant.status === 'Actif' ? 'secondary' : 'destructive'}>{currentTenant.status}</Badge></div>
+                        <div className="grid grid-cols-[120px_1fr] gap-x-4 gap-y-2">
+                          <div className="text-muted-foreground">Propriété</div><div className="font-medium">{currentTenant.propertyName}</div>
+                          <div className="text-muted-foreground">Loyer</div><div className="font-medium">{currentTenant.rent?.toFixed(2)} €</div>
+                          <div className="text-muted-foreground">Paiement le</div><div className="font-medium">{currentTenant.paymentDueDay} du mois</div>
+                          <div className="text-muted-foreground">Début du bail</div><div className="font-medium">{currentTenant.leaseStart}</div>
+                          <div className="text-muted-foreground">Durée</div><div className="font-medium">{currentTenant.leaseDuration} mois</div>
+                          <div className="text-muted-foreground">Statut</div><div><Badge variant={currentTenant.status === 'Actif' ? 'secondary' : 'destructive'}>{currentTenant.status}</Badge></div>
                         </div>
                       </div>
 
@@ -654,7 +657,7 @@ export default function TenantsPage() {
 
                       <div className="space-y-2">
                         <h4 className="font-semibold">Garantie Locative (Caution)</h4>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                        <div className="grid grid-cols-[120px_1fr] gap-x-4 gap-y-2">
                             <div className="text-muted-foreground">Montant</div><div className="font-medium">{currentTenant.depositAmount?.toFixed(2)} €</div>
                             <div className="text-muted-foreground">Statut</div><div><Badge>{currentTenant.depositStatus}</Badge></div>
                         </div>
