@@ -54,13 +54,13 @@ type DashboardClientProps = {
 }
 
 export function DashboardClient({ data }: DashboardClientProps) {
-  const { 
-    totalRevenue, 
-    occupancyRate, 
-    upcomingPaymentsCount, 
-    openIssuesCount, 
-    monthlyRevenue, 
-    recentActivity 
+  const {
+    totalRevenue,
+    occupancyRate,
+    upcomingPaymentsCount,
+    openIssuesCount,
+    monthlyRevenue,
+    recentActivity
   } = data;
 
   return (
@@ -128,8 +128,8 @@ export function DashboardClient({ data }: DashboardClientProps) {
               Revenus perçus au cours des 6 derniers mois.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ChartContainer config={{}} className="h-[300px] w-full">
+          <CardContent className="h-[300px] w-full p-0">
+            <ChartContainer config={{}} className="h-full w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <RechartsBarChart data={monthlyRevenue}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />

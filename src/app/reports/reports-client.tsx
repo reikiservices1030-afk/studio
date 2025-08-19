@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -96,11 +97,11 @@ export function ReportsClient() {
                 Un résumé de votre performance financière au cours des 6 derniers mois.
                 </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="h-[350px] w-full p-0">
                 <ChartContainer config={{
                   income: { label: "Revenus", color: "hsl(var(--chart-2))" },
                   expenses: { label: "Dépenses", color: "hsl(var(--chart-1))" },
-                }} className="h-[350px] w-full">
+                }} className="h-full w-full">
                 <ResponsiveContainer>
                     <AreaChart data={financialData}>
                     <defs>
