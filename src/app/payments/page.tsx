@@ -40,7 +40,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { ref, onValue, push, update } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
 import type { Tenant as TenantType, Payment, OwnerInfo, GroupedPayment } from '@/types';
@@ -87,9 +87,12 @@ export default function PaymentsPage() {
     const periods = new Set<string>();
     const d = new Date();
     for (let i = 0; i < 6; i++) {
-        d.setMonth(d.getMonth() - i);
-        if (i > 0) d.setDate(1); // avoid month skipping issues
-        periods.add(`${d.toLocaleString('fr-BE', { month: 'long' })} ${d.getFullYear()}`);
+        const monthDate = new Date(d.getFullYear(), d.getMonth() - i, 1);
+        const month = monthDate.toLocaleString('fr-BE', { month: 'long' });
+        const year = monthDate.getFullYear();
+        if (month) {
+          periods.add(`${month.charAt(0).toUpperCase() + month.slice(1)} ${year}`);
+        }
     }
     return Array.from(periods);
   }, []);
@@ -167,7 +170,7 @@ export default function PaymentsPage() {
     });
 
     return Object.values(groups).map(group => {
-        if (group.totalPaid >= group.totalDue && group.totalDue > 0) {
+        if (group.totalDue > 0 && group.totalPaid >= group.totalDue) {
             group.status = 'Payé';
         } else if (group.totalPaid > 0) {
             group.status = 'Partiel';
@@ -177,7 +180,7 @@ export default function PaymentsPage() {
         // Sort individual payments within the group by date
         group.payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         return group;
-    }).sort((a,b) => new Date(b.payments[0].date).getTime() - new Date(a.payments[0].date).getTime());
+    }).sort((a,b) => new Date(b.payments[0]?.date).getTime() - new Date(a.payments[0]?.date).getTime());
   }, [payments, tenants]);
   
   const resetDialog = () => {
@@ -443,7 +446,7 @@ export default function PaymentsPage() {
                         <div className="text-sm text-muted-foreground">{group.period}</div>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-right">
-                        <div className="font-medium">{group.totalPaid.toFixed(2)} € / {group.totalDue.toFixed(2)} €</div>
+                        <div className="font-medium">{group.totalPaid.toFixed(2)} € / {group.totalDue ? group.totalDue.toFixed(2) : '0.00'} €</div>
                         <div className="text-sm text-muted-foreground">
                             {group.payments.length} versement(s)
                         </div>
@@ -510,7 +513,7 @@ export default function PaymentsPage() {
                         const tenant = tenants.find(t => t.id === currentPayment.tenantId);
                         const amount = tenant ? (value === 'Loyer' ? tenant.rent : tenant.depositAmount) : 0;
                         const period = value === 'Loyer' ? `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}` : 'Caution';
-                        setCurrentPayment({ ...currentPayment, type: value, amount, period });
+                        setCurrentPayment({ ...currentPayment, type: value, amount: amount || 0, period });
                     }}
                     value={currentPayment.type}
                     disabled={isEditing}
@@ -531,7 +534,7 @@ export default function PaymentsPage() {
                         setCurrentPayment({
                             ...currentPayment, 
                             tenantId: value,
-                            amount
+                            amount: amount || 0
                         });
                     }}
                     value={currentPayment.tenantId}
