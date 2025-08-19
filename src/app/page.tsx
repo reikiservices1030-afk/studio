@@ -16,6 +16,16 @@ type DashboardData = {
   recentActivity: { id: string; tenant: string; activity: string; status: string }[];
 };
 
+// Helper function to return default data structure
+const getDefaultData = (): DashboardData => ({
+  totalRevenue: 0,
+  occupancyRate: 0,
+  upcomingPaymentsCount: 0,
+  openIssuesCount: 0,
+  monthlyRevenue: [],
+  recentActivity: [],
+});
+
 async function getDashboardData(): Promise<DashboardData> {
   try {
     // Fetch all necessary data in parallel
@@ -106,14 +116,7 @@ async function getDashboardData(): Promise<DashboardData> {
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
     // Return default/empty data on error to avoid crashing the page
-    return {
-      totalRevenue: 0,
-      occupancyRate: 0,
-      upcomingPaymentsCount: 0,
-      openIssuesCount: 0,
-      monthlyRevenue: [],
-      recentActivity: [],
-    };
+    return getDefaultData();
   }
 }
 
