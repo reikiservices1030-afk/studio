@@ -465,7 +465,7 @@ export default function TenantsPage() {
               <DialogHeader><DialogTitle>Détails du locataire</DialogTitle></DialogHeader>
               {currentTenant && (
                   <div className="grid gap-4 py-4 text-sm max-h-[60vh] overflow-y-auto pr-4">
-                      {currentTenant.idCardUrl && <Image src={currentTenant.idCardUrl} alt="ID Card" width={400} height={250} className="rounded-md object-contain mx-auto" />}
+                      {currentTenant.idCardUrl && <div className="relative w-full h-48 mb-4"><Image src={currentTenant.idCardUrl} alt="ID Card" layout="fill" className="rounded-md object-contain mx-auto" /></div>}
                       <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Nom:</div><div className="col-span-2 font-medium">{currentTenant.firstName} {currentTenant.lastName}</div></div>
                       <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Email:</div><div className="col-span-2 font-medium">{currentTenant.email}</div></div>
                       <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Téléphone:</div><div className="col-span-2 font-medium">{currentTenant.phone}</div></div>
