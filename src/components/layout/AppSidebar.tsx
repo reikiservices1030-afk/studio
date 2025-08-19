@@ -21,6 +21,7 @@ import {
   LogOut,
   Settings,
   Euro,
+  Building,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -29,6 +30,7 @@ const AppSidebar = () => {
   const navItems = [
     { href: '/', label: 'Tableau de bord', icon: LayoutDashboard },
     { href: '/tenants', label: 'Locataires', icon: Users },
+    { href: '/properties', label: 'Propriétés', icon: Building },
     { href: '/payments', label: 'Paiements', icon: Euro },
     { href: '/documents', label: 'Documents', icon: FileText },
     { href: '/reports', label: 'Rapports', icon: BarChart3 },
