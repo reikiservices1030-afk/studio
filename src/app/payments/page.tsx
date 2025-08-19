@@ -147,9 +147,9 @@ export default function PaymentsPage() {
         if (!groups[groupKey]) {
             let totalDue = 0;
             if (p.type === 'Loyer') {
-                totalDue = tenant?.rent || 0;
+                totalDue = tenant?.rent || p.rentDue || 0;
             } else if (p.type === 'Caution') {
-                totalDue = tenant?.depositAmount || 0;
+                totalDue = tenant?.depositAmount || p.rentDue || 0;
             }
 
             groups[groupKey] = {
