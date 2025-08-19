@@ -20,18 +20,20 @@ import {
   Bell,
   LogOut,
   Settings,
+  Receipt,
 } from 'lucide-react';
 import Link from 'next/link';
 
 const AppSidebar = () => {
   const pathname = usePathname();
   const navItems = [
-    { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/tenants', label: 'Tenants', icon: Users },
+    { href: '/', label: 'Tableau de bord', icon: LayoutDashboard },
+    { href: '/tenants', label: 'Locataires', icon: Users },
+    { href: '/payments', label: 'Paiements', icon: Receipt },
     { href: '/documents', label: 'Documents', icon: FileText },
-    { href: '/reports', label: 'Reports', icon: BarChart3 },
-    { href: '/analysis', label: 'Market Analysis', icon: Bot },
-    { href: '/reminders', label: 'Reminders', icon: Bell },
+    { href: '/reports', label: 'Rapports', icon: BarChart3 },
+    { href: '/analysis', label: 'Analyse du marché', icon: Bot },
+    { href: '/reminders', label: 'Rappels', icon: Bell },
   ];
 
   return (
@@ -63,18 +65,18 @@ const AppSidebar = () => {
       <SidebarFooter>
         <SidebarMenu>
             <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Settings">
+                <SidebarMenuButton asChild tooltip="Paramètres">
                   <Link href="#">
                     <Settings />
-                    <span>Settings</span>
+                    <span>Paramètres</span>
                   </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Logout">
+                <SidebarMenuButton asChild tooltip="Déconnexion">
                   <Link href="#">
                     <LogOut />
-                    <span>Logout</span>
+                    <span>Déconnexion</span>
                   </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>

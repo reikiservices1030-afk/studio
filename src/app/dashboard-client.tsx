@@ -42,41 +42,41 @@ import {
 
 const monthlyRevenue = [
   { month: 'Jan', revenue: 4000 },
-  { month: 'Feb', revenue: 3000 },
+  { month: 'Fév', revenue: 3000 },
   { month: 'Mar', revenue: 5000 },
-  { month: 'Apr', revenue: 4500 },
-  { month: 'May', revenue: 6000 },
-  { month: 'Jun', revenue: 5500 },
+  { month: 'Avr', revenue: 4500 },
+  { month: 'Mai', revenue: 6000 },
+  { month: 'Juin', revenue: 5500 },
 ];
 
 const recentActivity = [
   {
     id: 1,
     tenant: 'John Doe',
-    activity: 'Rent paid',
+    activity: 'Loyer payé',
     amount: 1200,
-    status: 'Completed',
+    status: 'Terminé',
   },
   {
     id: 2,
     tenant: 'Jane Smith',
-    activity: 'Maintenance request',
+    activity: 'Demande de maintenance',
     amount: null,
-    status: 'Pending',
+    status: 'En attente',
   },
   {
     id: 3,
     tenant: 'Mike Johnson',
-    activity: 'Lease signed',
+    activity: 'Bail signé',
     amount: null,
-    status: 'Completed',
+    status: 'Terminé',
   },
   {
     id: 4,
     tenant: 'Sarah Williams',
-    activity: 'Rent overdue',
+    activity: 'Loyer en retard',
     amount: 1500,
-    status: 'Overdue',
+    status: 'En retard',
   },
 ];
 
@@ -87,7 +87,7 @@ export function DashboardClient() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Total Rent Collected
+              Loyer total perçu
             </CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -95,14 +95,14 @@ export function DashboardClient() {
             <div className="text-2xl font-bold">$45,231.89</div>
             <p className="text-xs text-muted-foreground flex items-center">
               <ArrowUp className="h-3 w-3 text-green-500 mr-1" />
-              +20.1% from last month
+              +20.1% depuis le mois dernier
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Occupancy Rate
+              Taux d'occupation
             </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -114,26 +114,26 @@ export function DashboardClient() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Upcoming Payments
+              Paiements à venir
             </CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">5</div>
             <p className="text-xs text-muted-foreground">
-              Due within the next 7 days
+              Attendus dans les 7 prochains jours
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Open Issues</CardTitle>
+            <CardTitle className="text-sm font-medium">Problèmes ouverts</CardTitle>
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">3</div>
             <p className="text-xs text-muted-foreground">
-              Maintenance requests pending
+              Demandes de maintenance en attente
             </p>
           </CardContent>
         </Card>
@@ -142,9 +142,9 @@ export function DashboardClient() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         <Card className="lg:col-span-4">
           <CardHeader>
-            <CardTitle className="font-headline">Monthly Revenue</CardTitle>
+            <CardTitle className="font-headline">Revenus mensuels</CardTitle>
             <CardDescription>
-              Revenue collected over the past 6 months.
+              Revenus perçus au cours des 6 derniers mois.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -178,18 +178,18 @@ export function DashboardClient() {
         </Card>
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle className="font-headline">Recent Activity</CardTitle>
+            <CardTitle className="font-headline">Activité récente</CardTitle>
             <CardDescription>
-              Latest tenant and property activities.
+              Dernières activités des locataires et des propriétés.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tenant</TableHead>
-                  <TableHead>Activity</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Locataire</TableHead>
+                  <TableHead>Activité</TableHead>
+                  <TableHead>Statut</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -202,9 +202,9 @@ export function DashboardClient() {
                     <TableCell>
                       <Badge
                         variant={
-                          activity.status === 'Completed'
+                          activity.status === 'Terminé'
                             ? 'default'
-                            : activity.status === 'Pending'
+                            : activity.status === 'En attente'
                             ? 'secondary'
                             : 'destructive'
                         }

@@ -11,16 +11,16 @@ export async function runAnalysis(data: AnalyzeRentalMarketInput) {
     return { success: true, data: result };
   } catch (e) {
     console.error(e);
-    // In a real app, you'd want to log this error more robustly.
-    const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
-    return { success: false, error: `Failed to analyze market data: ${errorMessage}` };
+    // Dans une vraie application, vous voudriez logger cette erreur de manière plus robuste.
+    const errorMessage = e instanceof Error ? e.message : 'Une erreur inconnue est survenue.';
+    return { success: false, error: `Échec de l'analyse des données du marché : ${errorMessage}` };
   }
 }
 
 export default function AnalysisPage() {
   return (
     <div className="flex flex-col h-full">
-      <Header title="Rental Market Analysis" />
+      <Header title="Analyse du marché locatif" />
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
         <AnalysisClient runAnalysis={runAnalysis} />
       </div>

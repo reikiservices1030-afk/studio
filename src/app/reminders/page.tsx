@@ -28,67 +28,67 @@ import {
 const reminders = [
   {
     tenant: "John Doe",
-    property: "Apt 101, 123 Main St",
+    property: "Appt 101, 123 Rue Principale",
     dueDate: "2024-08-01",
     amount: 1200,
-    status: "Sent",
+    status: "Envoyé",
   },
   {
     tenant: "Jane Smith",
-    property: "Unit 5, 456 Oak Ave",
+    property: "Unité 5, 456 Avenue du Chêne",
     dueDate: "2024-08-01",
     amount: 1500,
-    status: "Sent",
+    status: "Envoyé",
   },
   {
     tenant: "Mike Johnson",
-    property: "Apt 202, 123 Main St",
+    property: "Appt 202, 123 Rue Principale",
     dueDate: "2024-08-01",
     amount: 1250,
-    status: "Pending",
+    status: "En attente",
   },
   {
     tenant: "Sarah Williams",
-    property: "House, 789 Pine Ln",
+    property: "Maison, 789 Allée des Pins",
     dueDate: "2024-08-01",
     amount: 2500,
-    status: "Scheduled",
+    status: "Programmé",
   },
   {
     tenant: "David Brown",
-    property: "Condo 3, 321 Elm Ct",
+    property: "Condo 3, 321 Cour des Ormes",
     dueDate: "2024-09-01",
     amount: 1800,
-    status: "Scheduled",
+    status: "Programmé",
   },
 ];
 
 export default function RemindersPage() {
   return (
     <div className="flex flex-col h-full">
-      <Header title="Rent Reminders">
+      <Header title="Rappels de loyer">
         <Button size="sm" className="gap-1">
           <PlusCircle className="h-3.5 w-3.5" />
-          New Reminder
+          Nouveau rappel
         </Button>
       </Header>
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Automated Reminders</CardTitle>
+            <CardTitle className="font-headline">Rappels automatisés</CardTitle>
             <CardDescription>
-              Manage and track automated rent reminders sent to tenants.
+              Gérez et suivez les rappels de loyer automatisés envoyés aux locataires.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tenant</TableHead>
-                  <TableHead className="hidden md:table-cell">Property</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead className="hidden sm:table-cell">Amount</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Locataire</TableHead>
+                  <TableHead className="hidden md:table-cell">Propriété</TableHead>
+                  <TableHead>Date d'échéance</TableHead>
+                  <TableHead className="hidden sm:table-cell">Montant</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead>
                     <span className="sr-only">Actions</span>
                   </TableHead>
@@ -102,25 +102,25 @@ export default function RemindersPage() {
                     <TableCell>{reminder.dueDate}</TableCell>
                     <TableCell className="hidden sm:table-cell">${reminder.amount.toFixed(2)}</TableCell>
                     <TableCell>
-                      <Badge variant={reminder.status === 'Sent' ? 'default' : reminder.status === 'Pending' ? 'destructive' : 'secondary'}>{reminder.status}</Badge>
+                      <Badge variant={reminder.status === 'Envoyé' ? 'default' : reminder.status === 'En attente' ? 'destructive' : 'secondary'}>{reminder.status}</Badge>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button aria-haspopup="true" size="icon" variant="ghost">
                             <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
+                            <span className="sr-only">Menu</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem disabled={reminder.status !== 'Pending'}>
+                          <DropdownMenuItem disabled={reminder.status !== 'En attente'}>
                             <Send className="mr-2 h-4 w-4" />
-                            Send Now
+                            Envoyer maintenant
                           </DropdownMenuItem>
                           <DropdownMenuItem>
                             <Bell className="mr-2 h-4 w-4" />
-                            View Schedule
+                            Voir le calendrier
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

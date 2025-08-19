@@ -26,36 +26,36 @@ import {
 
 const documents = [
   {
-    name: "Lease-Apt-101.pdf",
-    type: "Lease Agreement",
+    name: "Bail-Appt-101.pdf",
+    type: "Contrat de location",
     size: "1.2 MB",
     uploaded: "2024-01-15",
     icon: <FileText className="h-5 w-5 text-muted-foreground" />,
   },
   {
-    name: "Tenant-Info-2024.xlsx",
-    type: "Spreadsheet",
+    name: "Infos-Locataires-2024.xlsx",
+    type: "Tableur",
     size: "450 KB",
     uploaded: "2024-02-01",
     icon: <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />,
   },
   {
-    name: "Property-Inspection-Unit5.jpg",
+    name: "Inspection-Propriété-Unité5.jpg",
     type: "Image",
     size: "4.5 MB",
     uploaded: "2024-07-10",
     icon: <FileImage className="h-5 w-5 text-muted-foreground" />,
   },
   {
-    name: "Notice-of-Entry.pdf",
-    type: "Notice",
+    name: "Avis-d-entrée.pdf",
+    type: "Avis",
     size: "300 KB",
     uploaded: "2024-07-20",
     icon: <FileText className="h-5 w-5 text-muted-foreground" />,
   },
   {
-    name: "Rent-Receipt-Q2.pdf",
-    type: "Receipt",
+    name: "Reçu-Loyer-T2.pdf",
+    type: "Reçu",
     size: "250 KB",
     uploaded: "2024-07-05",
     icon: <FileText className="h-5 w-5 text-muted-foreground" />,
@@ -68,25 +68,25 @@ export default function DocumentsPage() {
       <Header title="Documents">
         <Button size="sm" className="gap-1">
           <Upload className="h-3.5 w-3.5" />
-          Upload Document
+          Télécharger un document
         </Button>
       </Header>
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Document Storage</CardTitle>
+            <CardTitle className="font-headline">Stockage de documents</CardTitle>
             <CardDescription>
-              Securely store and manage all your important documents.
+              Stockez et gérez en toute sécurité tous vos documents importants.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
+                  <TableHead>Nom</TableHead>
                   <TableHead className="hidden md:table-cell">Type</TableHead>
-                  <TableHead className="hidden sm:table-cell">Size</TableHead>
-                  <TableHead>Uploaded</TableHead>
+                  <TableHead className="hidden sm:table-cell">Taille</TableHead>
+                  <TableHead>Téléchargé le</TableHead>
                   <TableHead>
                     <span className="sr-only">Actions</span>
                   </TableHead>
@@ -109,14 +109,14 @@ export default function DocumentsPage() {
                         <DropdownMenuTrigger asChild>
                           <Button aria-haspopup="true" size="icon" variant="ghost">
                             <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
+                            <span className="sr-only">Menu</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem>Download</DropdownMenuItem>
-                          <DropdownMenuItem>Share</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                          <DropdownMenuItem>Télécharger</DropdownMenuItem>
+                          <DropdownMenuItem>Partager</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive">Supprimer</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
