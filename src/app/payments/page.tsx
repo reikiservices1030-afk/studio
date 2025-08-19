@@ -82,6 +82,17 @@ export default function PaymentsPage() {
     period: `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
   });
   const { toast } = useToast();
+  
+  const recentPeriods = useMemo(() => {
+    const periods = new Set<string>();
+    const d = new Date();
+    for (let i = 0; i < 6; i++) {
+        d.setMonth(d.getMonth() - i);
+        if (i > 0) d.setDate(1); // avoid month skipping issues
+        periods.add(`${d.toLocaleString('fr-BE', { month: 'long' })} ${d.getFullYear()}`);
+    }
+    return Array.from(periods);
+  }, []);
 
   useEffect(() => {
     const paymentsRef = ref(db, "payments");
@@ -150,11 +161,13 @@ export default function PaymentsPage() {
             };
         }
         groups[groupKey].payments.push(p);
-        groups[groupKey].totalPaid += p.amount;
+        if(p.status === 'Payé') {
+          groups[groupKey].totalPaid += p.amount;
+        }
     });
 
     return Object.values(groups).map(group => {
-        if (group.totalPaid >= group.totalDue) {
+        if (group.totalPaid >= group.totalDue && group.totalDue > 0) {
             group.status = 'Payé';
         } else if (group.totalPaid > 0) {
             group.status = 'Partiel';
@@ -191,29 +204,28 @@ export default function PaymentsPage() {
     const period = currentPayment.type === 'Loyer' ? currentPayment.period : 'Caution';
 
     try {
+      const paymentData = {
+        ...currentPayment,
+        amount: Number(currentPayment.amount),
+        tenantFirstName: tenant.firstName,
+        tenantLastName: tenant.lastName,
+        tenantId: tenant.id,
+        phone: tenant.phone,
+        email: tenant.email,
+        property: tenant.propertyName,
+        rentDue,
+        period,
+      };
+      
       if (isEditing && currentPayment.id) {
-        const paymentRef = ref(db, `payments/${currentPayment.id}`);
-        await update(paymentRef, {
-            ...currentPayment,
-            amount: Number(currentPayment.amount),
-        });
+        const { id, ...dataToUpdate } = paymentData;
+        const paymentRef = ref(db, `payments/${id}`);
+        await update(paymentRef, dataToUpdate);
         toast({ title: "Succès", description: "Paiement mis à jour."});
 
       } else {
-        await push(ref(db, "payments"), {
-            tenantFirstName: tenant.firstName,
-            tenantLastName: tenant.lastName,
-            tenantId: tenant.id,
-            phone: tenant.phone,
-            email: tenant.email,
-            property: tenant.propertyName,
-            date: currentPayment.date,
-            amount: Number(currentPayment.amount),
-            status: "Payé", // Status can be derived from amount vs due
-            period: period,
-            rentDue: rentDue,
-            type: currentPayment.type,
-        });
+        const { id, ...dataToCreate } = paymentData;
+        await push(ref(db, "payments"), dataToCreate);
         toast({ title: "Succès", description: "Paiement ajouté."});
       }
       resetDialog();
@@ -368,6 +380,23 @@ export default function PaymentsPage() {
     }
   };
 
+  const handlePeriodChange = (period: string) => {
+    if (!currentPayment.tenantId || isEditing) {
+        setCurrentPayment({ ...currentPayment, period: period });
+        return;
+    }
+    const groupKey = `${currentPayment.tenantId}-Loyer-${period}`;
+    const existingGroup = groupedPayments.find(g => g.groupKey === groupKey);
+
+    if (existingGroup && existingGroup.status !== 'Payé') {
+      const remainingAmount = existingGroup.totalDue - existingGroup.totalPaid;
+      setCurrentPayment({ ...currentPayment, period: period, amount: remainingAmount });
+    } else {
+      const tenant = tenants.find(t => t.id === currentPayment.tenantId);
+      setCurrentPayment({ ...currentPayment, period: period, amount: tenant?.rent || 0 });
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <Header title="Paiements">
@@ -420,7 +449,7 @@ export default function PaymentsPage() {
                         </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant={group.status === 'Payé' ? 'default' : 'destructive'}>
+                      <Badge variant={group.status === 'Payé' ? 'default' : (group.status === 'Partiel' ? 'secondary' : 'destructive')}>
                         {group.status}
                       </Badge>
                     </TableCell>
@@ -518,6 +547,21 @@ export default function PaymentsPage() {
                     </SelectContent>
                 </Select>
             </div>
+            {currentPayment.type === 'Loyer' && <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="period" className="text-right">Période</Label>
+               <Select
+                  onValueChange={handlePeriodChange}
+                  value={currentPayment.period}
+                  disabled={isEditing}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Sélectionnez une période" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {recentPeriods.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+            </div>}
              <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="amount" className="text-right">Montant (€)</Label>
               <Input id="amount" type="number" value={currentPayment.amount || ''} onChange={(e) => setCurrentPayment({...currentPayment, amount: Number(e.target.value)})} className="col-span-3" />
@@ -526,10 +570,6 @@ export default function PaymentsPage() {
               <Label htmlFor="date" className="text-right">Date</Label>
               <Input id="date" type="date" value={currentPayment.date || ''} onChange={(e) => setCurrentPayment({...currentPayment, date: e.target.value})} className="col-span-3" />
             </div>
-             {currentPayment.type === 'Loyer' && <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="period" className="text-right">Période</Label>
-              <Input id="period" value={currentPayment.period || ''} onChange={(e) => setCurrentPayment({...currentPayment, period: e.target.value})} className="col-span-3" />
-            </div>}
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="outline" onClick={resetDialog}>Annuler</Button></DialogClose>
