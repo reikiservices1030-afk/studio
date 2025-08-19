@@ -43,7 +43,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { db, storage } from "@/lib/firebase";
 import { ref, onValue, push, update } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
-import type { Tenant as TenantType, Payment, OwnerInfo, GroupedPayment } from '@/types';
+import type { Tenant as TenantType, Payment, OwnerInfo, GroupedPayment, Property } from '@/types';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -69,6 +69,7 @@ const WhatsappIcon = () => (
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [tenants, setTenants] = useState<TenantType[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
   const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -123,6 +124,13 @@ export default function PaymentsPage() {
       }
       setTenants(tenantsData);
     });
+    
+    const propertiesRef = ref(db, 'properties');
+    const unsubProperties = onValue(propertiesRef, (snapshot) => {
+      const data: Property[] = [];
+      snapshot.forEach((child) => data.push({id: child.key!, ...child.val()}));
+      setProperties(data);
+    });
 
     const ownerInfoRef = ref(db, 'ownerInfo');
     const unsubOwner = onValue(ownerInfoRef, (snapshot) => {
@@ -132,6 +140,7 @@ export default function PaymentsPage() {
     return () => {
       unsubPayments();
       unsubTenants();
+      unsubProperties();
       unsubOwner();
     };
   }, []);
@@ -161,6 +170,10 @@ export default function PaymentsPage() {
         if(p.status === 'Payé') {
           groups[groupKey].totalPaid += p.amount;
         }
+        // Ensure totalDue is set from the first payment of the group
+        if (!groups[groupKey].totalDue && p.rentDue) {
+          groups[groupKey].totalDue = p.rentDue;
+        }
     });
 
     return Object.values(groups).map(group => {
@@ -175,11 +188,12 @@ export default function PaymentsPage() {
         group.payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         return group;
     }).sort((a,b) => {
-      const dateA = a.payments[0]?.date ? new Date(a.payments[0].date) : new Date(0);
-      const dateB = b.payments[0]?.date ? new Date(b.payments[0].date) : new Date(0);
-      return dateB.getTime() - dateA.getTime();
+      // Prioritize period sorting for consistent order
+      if (a.period > b.period) return -1;
+      if (a.period < b.period) return 1;
+      return 0;
     });
-  }, [payments, tenants]);
+  }, [payments]);
   
   const resetDialog = () => {
     setIsDialogOpen(false);
@@ -200,8 +214,15 @@ export default function PaymentsPage() {
       toast({ variant: "destructive", title: "Erreur", description: "Veuillez remplir tous les champs."});
       return;
     }
+    const property = properties.find(p => p.id === tenant.propertyId);
     
-    const rentDue = currentPayment.type === 'Loyer' ? tenant.rent : tenant.depositAmount;
+    let rentDue = 0;
+    if (currentPayment.type === 'Loyer' && property) {
+        rentDue = property.rent;
+    } else if (currentPayment.type === 'Caution') {
+        rentDue = tenant.depositAmount || 0;
+    }
+    
     const period = currentPayment.type === 'Loyer' && currentPayment.period ? currentPayment.period : 'Caution';
 
     try {
@@ -383,7 +404,7 @@ export default function PaymentsPage() {
   };
 
   const handlePeriodChange = (period: string) => {
-    if (!currentPayment.tenantId || isEditing) {
+    if (!currentPayment.tenantId) {
         setCurrentPayment({ ...currentPayment, period: period });
         return;
     }
@@ -395,7 +416,33 @@ export default function PaymentsPage() {
       setCurrentPayment({ ...currentPayment, period: period, amount: remainingAmount > 0 ? remainingAmount : 0 });
     } else {
       const tenant = tenants.find(t => t.id === currentPayment.tenantId);
-      setCurrentPayment({ ...currentPayment, period: period, amount: tenant?.rent || 0 });
+      const property = tenant ? properties.find(p => p.id === tenant.propertyId) : undefined;
+      setCurrentPayment({ ...currentPayment, period: period, amount: property?.rent || 0 });
+    }
+  };
+  
+  const handleTenantChange = (tenantId: string) => {
+    const tenant = tenants.find(t => t.id === tenantId);
+    if (!tenant) return;
+    
+    const property = properties.find(p => p.id === tenant.propertyId);
+    let amount = 0;
+    if(property){
+        if (currentPayment.type === 'Loyer') {
+            amount = property.rent;
+        } else if (currentPayment.type === 'Caution') {
+            amount = tenant.depositAmount || 0;
+        }
+    }
+    
+    setCurrentPayment({
+        ...currentPayment,
+        tenantId: tenantId,
+        amount: amount,
+    });
+
+    if (currentPayment.type === 'Loyer' && currentPayment.period) {
+        handlePeriodChange(currentPayment.period);
     }
   };
 
@@ -510,12 +557,12 @@ export default function PaymentsPage() {
                 <Select
                     onValueChange={(value: 'Loyer' | 'Caution') => {
                         const tenant = tenants.find(t => t.id === currentPayment.tenantId);
-                        const amount = tenant ? (value === 'Loyer' ? tenant.rent : tenant.depositAmount) : 0;
+                        const property = tenant ? properties.find(p => p.id === tenant.propertyId) : undefined;
+                        const amount = property ? (value === 'Loyer' ? property.rent : tenant?.depositAmount) : 0;
                         const period = value === 'Loyer' ? (recentPeriods[0] || '') : 'Caution';
                         setCurrentPayment({ ...currentPayment, type: value, amount: amount || 0, period });
                     }}
                     value={currentPayment.type}
-                    disabled={isEditing}
                 >
                     <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -527,17 +574,8 @@ export default function PaymentsPage() {
              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="tenant" className="text-right">Locataire</Label>
                 <Select 
-                    onValueChange={(value) => {
-                        const selectedTenant = tenants.find(t => t.id === value);
-                        const amount = selectedTenant ? (currentPayment.type === 'Loyer' ? selectedTenant.rent : selectedTenant.depositAmount) : 0;
-                        setCurrentPayment({
-                            ...currentPayment, 
-                            tenantId: value,
-                            amount: amount || 0
-                        });
-                    }}
+                    onValueChange={handleTenantChange}
                     value={currentPayment.tenantId}
-                    disabled={isEditing}
                 >
                     <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Sélectionnez un locataire" />
@@ -554,7 +592,6 @@ export default function PaymentsPage() {
                <Select
                   onValueChange={handlePeriodChange}
                   value={currentPayment.period}
-                  disabled={isEditing}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Sélectionnez une période" />
@@ -582,3 +619,4 @@ export default function PaymentsPage() {
     </div>
   );
 }
+
