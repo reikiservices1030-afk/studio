@@ -341,7 +341,7 @@ export default function TenantsPage() {
     setCurrentTenant(tenant);
     
     // Fetch maintenances for this tenant
-    const maintenancesQuery = query(ref(db, 'maintenances'), orderByChild('tenantId'), equalTo(tenant.id));
+    const maintenancesQuery = query(dbRef(db, 'maintenances'), orderByChild('tenantId'), equalTo(tenant.id));
     onValue(maintenancesQuery, (snapshot) => {
         const data: Maintenance[] = [];
         snapshot.forEach(child => data.push({id: child.key!, ...child.val()}));
@@ -376,7 +376,7 @@ export default function TenantsPage() {
             }
         });
 
-        await update(ref(db), updates);
+        await update(dbRef(db), updates);
 
         toast({ title: 'Succès', description: 'Statut de la caution mis à jour.' });
         setIsDepositOpen(false);
