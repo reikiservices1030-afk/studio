@@ -19,12 +19,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle, Loader2, Edit, Trash2 } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Loader2, Edit, Trash2, Mail } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -43,6 +44,23 @@ import { db } from "@/lib/firebase";
 import { ref, onValue, push, update, remove } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
 import type { Tenant, Property, Maintenance } from '@/types';
+
+const WhatsappIcon = () => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+    >
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  );
 
 export default function MaintenancePage() {
     const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
@@ -142,6 +160,33 @@ export default function MaintenancePage() {
         setIsDialogOpen(true);
     };
 
+    const getMessageText = (item: Maintenance) => {
+        return `Bonjour ${item.tenantName},\n\nCeci est une notification concernant une intervention de maintenance sur votre propriété.\n\nDétails:\n- Date: ${item.date}\n- Description: ${item.description}\n- Coût: ${item.cost.toFixed(2)} €\n\nCordialement,`;
+    };
+
+    const handleSendWhatsApp = (item: Maintenance) => {
+        const tenant = tenants.find(t => t.id === item.tenantId);
+        if (!tenant || !tenant.phone) {
+            toast({ variant: "destructive", title: "Erreur", description: "Numéro de téléphone du locataire manquant." });
+            return;
+        }
+        const message = getMessageText(item);
+        const whatsappUrl = `https://wa.me/${tenant.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+    };
+
+    const handleSendEmail = (item: Maintenance) => {
+        const tenant = tenants.find(t => t.id === item.tenantId);
+        if (!tenant || !tenant.email) {
+            toast({ variant: "destructive", title: "Erreur", description: "Email du locataire manquant." });
+            return;
+        }
+        const subject = `Notification de maintenance: ${item.description}`;
+        const body = getMessageText(item);
+        const mailtoUrl = `mailto:${tenant.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailtoUrl;
+    };
+
     return (
         <div className="flex flex-col h-full">
             <Header title="Maintenance et Réparations">
@@ -192,6 +237,19 @@ export default function MaintenancePage() {
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem onClick={() => openEditDialog(item)}><Edit className="mr-2 h-4 w-4"/> Modifier</DropdownMenuItem>
                                                         <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}><Trash2 className="mr-2 h-4 w-4"/> Supprimer</DropdownMenuItem>
+                                                        {item.tenantId && (
+                                                            <>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem onClick={() => handleSendWhatsApp(item)}>
+                                                                    <WhatsappIcon />
+                                                                    <span className="ml-2">Envoyer par WhatsApp</span>
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleSendEmail(item)}>
+                                                                    <Mail className="mr-2 h-4 w-4" />
+                                                                    Envoyer par Email
+                                                                </DropdownMenuItem>
+                                                            </>
+                                                        )}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </TableCell>
