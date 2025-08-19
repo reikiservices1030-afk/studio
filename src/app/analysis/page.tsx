@@ -17,7 +17,7 @@ export async function runAnalysis(data: AnalyzeRentalMarketInput) {
   }
 }
 
-export default function AnalysisPage() {
+export default async function AnalysisPage() {
   return (
     <div className="flex flex-col h-full">
       <Header title="Analyse du marché locatif" />
