@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,7 +43,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { db } from "@/lib/firebase";
 import { ref, onValue, push, update } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
-import type { Tenant as TenantType, Payment, OwnerInfo } from '@/types';
+import type { Tenant as TenantType, Payment, OwnerInfo, GroupedPayment } from '@/types';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -78,6 +78,7 @@ export default function PaymentsPage() {
     date: new Date().toISOString().split('T')[0],
     amount: 0,
     status: "Payé",
+    type: "Loyer",
     period: `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
   });
   const { toast } = useToast();
@@ -119,6 +120,52 @@ export default function PaymentsPage() {
       unsubOwner();
     };
   }, []);
+
+  const groupedPayments = useMemo((): GroupedPayment[] => {
+    const groups: { [key: string]: GroupedPayment } = {};
+
+    payments.forEach(p => {
+        const groupKey = `${p.tenantId}-${p.type}-${p.period}`;
+        if (!groups[groupKey]) {
+            const tenant = tenants.find(t => t.id === p.tenantId);
+            let totalDue = 0;
+            if (p.type === 'Loyer') {
+                totalDue = tenant?.rent || 0;
+            } else if (p.type === 'Caution') {
+                totalDue = tenant?.depositAmount || 0;
+            }
+
+            groups[groupKey] = {
+                groupKey,
+                tenantId: p.tenantId,
+                tenantFirstName: p.tenantFirstName,
+                tenantLastName: p.tenantLastName,
+                property: p.property,
+                type: p.type,
+                period: p.period,
+                totalDue: totalDue,
+                totalPaid: 0,
+                status: '',
+                payments: [],
+            };
+        }
+        groups[groupKey].payments.push(p);
+        groups[groupKey].totalPaid += p.amount;
+    });
+
+    return Object.values(groups).map(group => {
+        if (group.totalPaid >= group.totalDue) {
+            group.status = 'Payé';
+        } else if (group.totalPaid > 0) {
+            group.status = 'Partiel';
+        } else {
+            group.status = 'Non payé';
+        }
+        // Sort individual payments within the group by date
+        group.payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        return group;
+    }).sort((a,b) => new Date(b.payments[0].date).getTime() - new Date(a.payments[0].date).getTime());
+  }, [payments, tenants]);
   
   const resetDialog = () => {
     setIsDialogOpen(false);
@@ -128,16 +175,20 @@ export default function PaymentsPage() {
         date: new Date().toISOString().split('T')[0],
         amount: 0,
         status: "Payé",
+        type: "Loyer",
         period: `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
     });
   };
 
   const handleSavePayment = async () => {
     const tenant = tenants.find(t => t.id === currentPayment.tenantId);
-    if (!tenant || !currentPayment.amount || !currentPayment.date) {
+    if (!tenant || !currentPayment.amount || !currentPayment.date || !currentPayment.type) {
       toast({ variant: "destructive", title: "Erreur", description: "Veuillez remplir tous les champs."});
       return;
     }
+    
+    const rentDue = currentPayment.type === 'Loyer' ? tenant.rent : tenant.depositAmount;
+    const period = currentPayment.type === 'Loyer' ? currentPayment.period : 'Caution';
 
     try {
       if (isEditing && currentPayment.id) {
@@ -158,9 +209,10 @@ export default function PaymentsPage() {
             property: tenant.propertyName,
             date: currentPayment.date,
             amount: Number(currentPayment.amount),
-            status: currentPayment.status,
-            period: currentPayment.period,
-            rentDue: tenant.rent,
+            status: "Payé", // Status can be derived from amount vs due
+            period: period,
+            rentDue: rentDue,
+            type: currentPayment.type,
         });
         toast({ title: "Succès", description: "Paiement ajouté."});
       }
@@ -184,50 +236,56 @@ export default function PaymentsPage() {
         date: new Date().toISOString().split('T')[0],
         amount: 0,
         status: "Payé",
+        type: 'Loyer',
         period: `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
     });
     setIsDialogOpen(true);
   }
 
-  const getReceiptText = (payment: Payment) => {
-    const balance = payment.rentDue - payment.amount;
-    let balanceText = `Solde restant pour ${payment.period}: ${balance.toFixed(2)} €`;
+  const getReceiptText = (group: GroupedPayment) => {
+    const balance = group.totalDue - group.totalPaid;
+    let balanceText = `Solde restant pour ${group.period}: ${balance.toFixed(2)} €`;
     if (balance <= 0) {
       balanceText = "Ce paiement solde la période.";
     }
 
-    return `Bonjour ${payment.tenantFirstName} ${payment.tenantLastName},\n\nVoici votre reçu pour le loyer de ${payment.period}.\n\n- Montant payé : ${payment.amount.toFixed(2)} €\n- Loyer dû : ${payment.rentDue.toFixed(2)} €\n- Date de paiement : ${payment.date}\n- Propriété : ${payment.property}\n\n${balanceText}\n\nCordialement,\n${ownerInfo?.name || ''}`;
+    let paymentsDetails = group.payments.map(p => `- ${new Date(p.date).toLocaleDateString('fr-BE')}: ${p.amount.toFixed(2)} €`).join('\n');
+
+    return `Bonjour ${group.tenantFirstName} ${group.tenantLastName},\n\nVoici votre reçu pour le paiement de ${group.type.toLowerCase()} pour ${group.period}.\n\n- Montant total dû : ${group.totalDue.toFixed(2)} €\n- Montant total payé : ${group.totalPaid.toFixed(2)} €\n- Propriété : ${group.property}\n\nDétails des paiements:\n${paymentsDetails}\n\n${balanceText}\n\nCordialement,\n${ownerInfo?.name || ''}`;
   }
 
-  const handleSendReceipt = (payment: Payment) => {
-    if (!payment.phone) {
+  const handleSendReceipt = (group: GroupedPayment) => {
+    const tenant = tenants.find(t => t.id === group.tenantId);
+    if (!tenant?.phone) {
       toast({ variant: "destructive", title: "Erreur", description: "Numéro de téléphone du locataire manquant."});
       return;
     }
-    const receiptText = getReceiptText(payment);
-    const whatsappUrl = `https://wa.me/${payment.phone.replace(/\D/g, '')}?text=${encodeURIComponent(receiptText)}`;
+    const receiptText = getReceiptText(group);
+    const whatsappUrl = `https://wa.me/${tenant.phone.replace(/\D/g, '')}?text=${encodeURIComponent(receiptText)}`;
     window.open(whatsappUrl, '_blank');
   };
   
-  const handleEmailReceipt = (payment: Payment) => {
-    if (!payment.email) {
+  const handleEmailReceipt = (group: GroupedPayment) => {
+    const tenant = tenants.find(t => t.id === group.tenantId);
+    if (!tenant?.email) {
       toast({ variant: "destructive", title: "Erreur", description: "Email du locataire manquant."});
       return;
     }
-    const subject = `Reçu de loyer pour ${payment.period}`;
-    const body = getReceiptText(payment);
-    const mailtoUrl = `mailto:${payment.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const subject = `Reçu de paiement pour ${group.period}`;
+    const body = getReceiptText(group);
+    const mailtoUrl = `mailto:${tenant.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailtoUrl;
   };
 
-  const getReceiptHTML = (payment: Payment) => {
-    const balance = payment.rentDue - payment.amount;
-    const balanceText = balance > 0 ? `<tr><th>Solde restant:</th><td>${balance.toFixed(2)} €</td></tr>` : '<tr><td colspan="2" style="text-align:center; font-weight:bold;">Paiement complet</td></tr>';
-    
+  const getReceiptHTML = (group: GroupedPayment) => {
+    const balance = group.totalDue - group.totalPaid;
+    const balanceText = balance > 0 ? `<tr><th style="color: #e53e3e;">Solde restant:</th><td style="color: #e53e3e; font-weight: bold;">${balance.toFixed(2)} €</td></tr>` : '<tr><td colspan="2" style="text-align:center; font-weight:bold; color: #38a169;">Paiement complet</td></tr>';
+    const paymentsHtml = group.payments.map(p => `<tr><td>Paiement du ${new Date(p.date).toLocaleDateString('fr-BE')}</td><td>${p.amount.toFixed(2)} €</td></tr>`).join('');
+
     return `
       <html>
         <head>
-          <title>Reçu de Loyer - ${payment.period}</title>
+          <title>Quittance de ${group.type} - ${group.period}</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 0; padding: 2rem; color: #333; }
             .container { border: 1px solid #eee; padding: 2rem; border-radius: 10px; max-width: 800px; margin: auto; background: white; }
@@ -241,16 +299,16 @@ export default function PaymentsPage() {
             .details table { width: 100%; border-collapse: collapse; }
             .details th, .details td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #eee; }
             .details th { color: #555; font-weight: normal; width: 40%;}
-            .total { text-align: right; margin-top: 2rem; }
-            .total h2 { margin: 0; font-size: 1.5rem; }
+            .total { text-align: right; margin-top: 1rem; }
+            .total td { font-size: 1.2rem; font-weight: bold; }
             .footer { text-align: center; margin-top: 2rem; font-size: 0.8rem; color: #777; }
           </style>
         </head>
         <body>
           <div class="container">
             <div class="header">
-              <h1>QUITTANCE DE LOYER</h1>
-              <p>Période de ${payment.period}</p>
+              <h1>QUITTANCE DE ${group.type.toUpperCase()}</h1>
+              <p>Période: ${group.period}</p>
             </div>
              <div class="parties">
                 <div class="party">
@@ -259,14 +317,17 @@ export default function PaymentsPage() {
                 </div>
                 <div class="party">
                     <h2>Locataire</h2>
-                    <p><strong>${payment.tenantFirstName} ${payment.tenantLastName}</strong><br>${payment.property}</p>
+                    <p><strong>${group.tenantFirstName} ${group.tenantLastName}</strong><br>${group.property}</p>
                 </div>
             </div>
             <div class="details">
+              <h4>Détails des versements</h4>
               <table>
-                <tr><th>Date du paiement:</th><td>${new Date(payment.date).toLocaleDateString('fr-BE')}</td></tr>
-                <tr><th>Loyer dû pour la période:</th><td>${payment.rentDue.toFixed(2)} €</td></tr>
-                <tr><th>Montant payé:</th><td><strong>${payment.amount.toFixed(2)} €</strong></td></tr>
+                ${paymentsHtml}
+              </table>
+              <table class="total">
+                <tr><th>Total dû:</th><td>${group.totalDue.toFixed(2)} €</td></tr>
+                <tr><th>Total payé:</th><td style="color: #38a169; font-weight: bold;">${group.totalPaid.toFixed(2)} €</td></tr>
                 ${balanceText}
               </table>
             </div>
@@ -279,10 +340,12 @@ export default function PaymentsPage() {
     `;
   }
 
-  const handlePrintReceipt = async (payment: Payment) => {
-    const receiptHtml = getReceiptHTML(payment);
+  const handlePrintReceipt = async (group: GroupedPayment) => {
+    const receiptHtml = getReceiptHTML(group);
 
     const printContainer = document.createElement('div');
+    printContainer.style.position = 'absolute';
+    printContainer.style.left = '-9999px';
     printContainer.innerHTML = receiptHtml;
     document.body.appendChild(printContainer);
     
@@ -295,13 +358,10 @@ export default function PaymentsPage() {
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       
-      const fileName = `Quittance-${payment.tenantLastName}-${payment.period.replace(' ', '-')}.pdf`;
-      pdf.save(fileName);
+      pdf.output('dataurlnewwindow');
       
-      toast({ title: "Succès", description: "Reçu téléchargé." });
-
     } catch (error) {
-      console.error("Error saving or printing receipt:", error);
+      console.error("Error generating receipt:", error);
       toast({ variant: "destructive", title: "Erreur", description: "Impossible de générer le reçu." });
     } finally {
         document.body.removeChild(printContainer);
@@ -321,7 +381,7 @@ export default function PaymentsPage() {
           <CardHeader>
             <CardTitle className="font-headline">Historique des paiements</CardTitle>
             <CardDescription>
-              Suivez tous les paiements de loyer et générez des reçus.
+              Suivez tous les paiements de loyer et de caution.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -334,26 +394,34 @@ export default function PaymentsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Locataire</TableHead>
-                  <TableHead className="hidden md:table-cell">Date</TableHead>
-                  <TableHead className="hidden sm:table-cell">Montant</TableHead>
-                  <TableHead>Statut</TableHead>
+                  <TableHead>Type / Période</TableHead>
+                  <TableHead className="hidden sm:table-cell text-right">Montant Payé / Dû</TableHead>
+                  <TableHead className="text-center">Statut</TableHead>
                   <TableHead>
                     <span className="sr-only">Actions</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payments.map((payment) => (
-                  <TableRow key={payment.id}>
+                {groupedPayments.map((group) => (
+                  <TableRow key={group.groupKey}>
                     <TableCell>
-                      <div className="font-medium">{payment.tenantFirstName} {payment.tenantLastName}</div>
-                      <div className="text-sm text-muted-foreground">{payment.property}</div>
+                      <div className="font-medium">{group.tenantFirstName} {group.tenantLastName}</div>
+                      <div className="text-sm text-muted-foreground">{group.property}</div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">{payment.date}</TableCell>
-                    <TableCell className="hidden sm:table-cell">{payment.amount.toFixed(2)} €</TableCell>
                     <TableCell>
-                      <Badge variant={payment.amount >= payment.rentDue ? 'default' : 'destructive'}>
-                        {payment.amount >= payment.rentDue ? 'Payé' : 'Partiel'}
+                        <div className="font-medium">{group.type}</div>
+                        <div className="text-sm text-muted-foreground">{group.period}</div>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell text-right">
+                        <div className="font-medium">{group.totalPaid.toFixed(2)} € / {group.totalDue.toFixed(2)} €</div>
+                        <div className="text-sm text-muted-foreground">
+                            {group.payments.length} versement(s)
+                        </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={group.status === 'Payé' ? 'default' : 'destructive'}>
+                        {group.status}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -365,22 +433,26 @@ export default function PaymentsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => openEditDialog(payment)}>
-                             <Edit className="mr-2 h-4 w-4" /> Modifier
+                          <DropdownMenuLabel>Actions sur le groupe</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => handlePrintReceipt(group)}>
+                            <Printer className="mr-2 h-4 w-4" />
+                            Voir le reçu global
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleSendReceipt(payment)}>
+                          <DropdownMenuItem onClick={() => handleSendReceipt(group)}>
                             <WhatsappIcon />
                             <span className="ml-2">Envoyer par WhatsApp</span>
                           </DropdownMenuItem>
-                           <DropdownMenuItem onClick={() => handleEmailReceipt(payment)}>
+                           <DropdownMenuItem onClick={() => handleEmailReceipt(group)}>
                             <Mail className="mr-2 h-4 w-4" />
                             Envoyer par Email
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handlePrintReceipt(payment)}>
-                            <Printer className="mr-2 h-4 w-4" />
-                            Télécharger le reçu
-                          </DropdownMenuItem>
+                          <DropdownMenuLabel>Versements individuels</DropdownMenuLabel>
+                           {group.payments.map(p => (
+                             <DropdownMenuItem key={p.id} onClick={() => openEditDialog(p)}>
+                                <Edit className="mr-2 h-4 w-4" /> 
+                                Modifier {p.amount.toFixed(2)}€ du {new Date(p.date).toLocaleDateString('fr-BE')}
+                             </DropdownMenuItem>
+                           ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -398,19 +470,39 @@ export default function PaymentsPage() {
           <DialogHeader>
             <DialogTitle>{isEditing ? 'Modifier le paiement' : 'Ajouter un paiement'}</DialogTitle>
             <DialogDescription>
-              {isEditing ? 'Mettez à jour les détails de ce paiement.' : 'Enregistrez un nouveau paiement de loyer.'}
+              {isEditing ? 'Mettez à jour les détails de ce paiement.' : 'Enregistrez un nouveau paiement.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="type" className="text-right">Type</Label>
+                <Select
+                    onValueChange={(value: 'Loyer' | 'Caution') => {
+                        const tenant = tenants.find(t => t.id === currentPayment.tenantId);
+                        const amount = tenant ? (value === 'Loyer' ? tenant.rent : tenant.depositAmount) : 0;
+                        const period = value === 'Loyer' ? `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}` : 'Caution';
+                        setCurrentPayment({ ...currentPayment, type: value, amount, period });
+                    }}
+                    value={currentPayment.type}
+                    disabled={isEditing}
+                >
+                    <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Loyer">Loyer</SelectItem>
+                        <SelectItem value="Caution">Caution</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="tenant" className="text-right">Locataire</Label>
                 <Select 
                     onValueChange={(value) => {
                         const selectedTenant = tenants.find(t => t.id === value);
+                        const amount = selectedTenant ? (currentPayment.type === 'Loyer' ? selectedTenant.rent : selectedTenant.depositAmount) : 0;
                         setCurrentPayment({
                             ...currentPayment, 
                             tenantId: value,
-                            amount: selectedTenant?.rent || 0
+                            amount
                         });
                     }}
                     value={currentPayment.tenantId}
@@ -434,22 +526,10 @@ export default function PaymentsPage() {
               <Label htmlFor="date" className="text-right">Date</Label>
               <Input id="date" type="date" value={currentPayment.date || ''} onChange={(e) => setCurrentPayment({...currentPayment, date: e.target.value})} className="col-span-3" />
             </div>
-             <div className="grid grid-cols-4 items-center gap-4">
+             {currentPayment.type === 'Loyer' && <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="period" className="text-right">Période</Label>
               <Input id="period" value={currentPayment.period || ''} onChange={(e) => setCurrentPayment({...currentPayment, period: e.target.value})} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="status" className="text-right">Statut</Label>
-                <Select value={currentPayment.status} onValueChange={(value) => setCurrentPayment({...currentPayment, status: value})}>
-                    <SelectTrigger className="col-span-3">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Payé">Payé</SelectItem>
-                        <SelectItem value="En retard">En retard</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
+            </div>}
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="outline" onClick={resetDialog}>Annuler</Button></DialogClose>

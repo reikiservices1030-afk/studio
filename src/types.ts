@@ -1,6 +1,7 @@
 
 
 
+
 export type OwnerInfo = {
   name: string;
   address: string;
@@ -51,8 +52,9 @@ export type Payment = {
   date: string;
   amount: number;
   status: string;
-  period: string;
-  rentDue: number;
+  period: string; // e.g., "Juillet 2024" for rent, or "Caution" for deposit
+  rentDue: number; // For rent payments, this is the rent amount. For deposit, the total deposit amount.
+  type: 'Loyer' | 'Caution';
 };
 
 export type Reminder = {
@@ -73,4 +75,18 @@ export type Document = {
   uploaded: string;
   url: string;
   path: string;
+};
+
+export type GroupedPayment = {
+  groupKey: string; // e.g., "tenantId-Loyer-Juillet 2024" or "tenantId-Caution"
+  tenantId: string;
+  tenantFirstName: string;
+  tenantLastName: string;
+  property: string;
+  type: 'Loyer' | 'Caution';
+  period: string;
+  totalDue: number;
+  totalPaid: number;
+  status: string;
+  payments: Payment[];
 };
