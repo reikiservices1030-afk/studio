@@ -30,6 +30,7 @@ import {
   FileText,
   Camera,
   Upload,
+  Trash2,
 } from 'lucide-react';
 import {
   DropdownMenu,
