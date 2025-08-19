@@ -65,6 +65,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import type { Tenant, Property, OwnerInfo } from '@/types';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { Separator } from '@/components/ui/separator';
 
 
 const WhatsappIcon = () => (
@@ -613,26 +614,51 @@ export default function TenantsPage() {
       </Dialog>
       
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-lg">
               <DialogHeader><DialogTitle>Détails du locataire</DialogTitle><DialogDescription>Informations complètes sur le locataire.</DialogDescription></DialogHeader>
               {currentTenant && (
-                  <div className="grid gap-4 py-4 text-sm max-h-[60vh] overflow-y-auto pr-4">
-                      {currentTenant.idCardUrl && <div className="relative w-full h-48 mb-4"><Image src={currentTenant.idCardUrl} alt="ID Card" layout="fill" className="rounded-md object-contain mx-auto" /></div>}
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Nom:</div><div className="col-span-2 font-medium">{currentTenant.firstName} {currentTenant.lastName}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Email:</div><div className="col-span-2 font-medium">{currentTenant.email}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Téléphone:</div><div className="col-span-2 font-medium">{currentTenant.phone}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">N° National:</div><div className="col-span-2 font-medium">{currentTenant.nationalId}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Nationalité:</div><div className="col-span-2 font-medium">{currentTenant.nationality}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Compte bancaire:</div><div className="col-span-2 font-medium">{currentTenant.bankAccount}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Propriété:</div><div className="col-span-2 font-medium">{currentTenant.propertyName}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Loyer:</div><div className="col-span-2 font-medium">{currentTenant.rent?.toFixed(2)} €</div></div>
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Paiement le:</div><div className="col-span-2 font-medium">{currentTenant.paymentDueDay} du mois</div></div>
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Début du bail:</div><div className="col-span-2 font-medium">{currentTenant.leaseStart}</div></div>
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Durée:</div><div className="col-span-2 font-medium">{currentTenant.leaseDuration} mois</div></div>
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Statut:</div><div className="col-span-2 font-medium"><Badge variant={currentTenant.status === 'Actif' ? 'secondary' : 'destructive'}>{currentTenant.status}</Badge></div></div>
-                      <hr className="col-span-3"/>
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Caution:</div><div className="col-span-2 font-medium">{currentTenant.depositAmount?.toFixed(2)} €</div></div>
-                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Statut caution:</div><div className="col-span-2 font-medium"><Badge>{currentTenant.depositStatus}</Badge></div></div>
+                  <div className="space-y-4 py-4 text-sm max-h-[70vh] overflow-y-auto pr-4">
+                      {currentTenant.idCardUrl && (
+                        <div className="relative w-full h-48 mb-4">
+                            <Image src={currentTenant.idCardUrl} alt="ID Card" fill className="rounded-md object-contain mx-auto" />
+                        </div>
+                      )}
+                      
+                      <div className="space-y-2">
+                        <h4 className="font-semibold">Informations Personnelles</h4>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            <div className="text-muted-foreground">Nom</div><div className="font-medium">{currentTenant.firstName} {currentTenant.lastName}</div>
+                            <div className="text-muted-foreground">Email</div><div className="font-medium">{currentTenant.email}</div>
+                            <div className="text-muted-foreground">Téléphone</div><div className="font-medium">{currentTenant.phone}</div>
+                            <div className="text-muted-foreground">N° National</div><div className="font-medium">{currentTenant.nationalId}</div>
+                            <div className="text-muted-foreground">Nationalité</div><div className="font-medium">{currentTenant.nationality}</div>
+                            <div className="text-muted-foreground">Compte bancaire</div><div className="font-medium">{currentTenant.bankAccount}</div>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-2">
+                        <h4 className="font-semibold">Informations sur le Bail</h4>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            <div className="text-muted-foreground">Propriété</div><div className="font-medium">{currentTenant.propertyName}</div>
+                            <div className="text-muted-foreground">Loyer</div><div className="font-medium">{currentTenant.rent?.toFixed(2)} €</div>
+                            <div className="text-muted-foreground">Paiement le</div><div className="font-medium">{currentTenant.paymentDueDay} du mois</div>
+                            <div className="text-muted-foreground">Début du bail</div><div className="font-medium">{currentTenant.leaseStart}</div>
+                            <div className="text-muted-foreground">Durée</div><div className="font-medium">{currentTenant.leaseDuration} mois</div>
+                            <div className="text-muted-foreground">Statut</div><div><Badge variant={currentTenant.status === 'Actif' ? 'secondary' : 'destructive'}>{currentTenant.status}</Badge></div>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-2">
+                        <h4 className="font-semibold">Garantie Locative (Caution)</h4>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            <div className="text-muted-foreground">Montant</div><div className="font-medium">{currentTenant.depositAmount?.toFixed(2)} €</div>
+                            <div className="text-muted-foreground">Statut</div><div><Badge>{currentTenant.depositStatus}</Badge></div>
+                        </div>
+                      </div>
                   </div>
               )}
               <DialogFooter><DialogClose asChild><Button variant="outline">Fermer</Button></DialogClose></DialogFooter>
