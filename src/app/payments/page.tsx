@@ -147,9 +147,9 @@ export default function PaymentsPage() {
         if (!groups[groupKey]) {
             let totalDue = 0;
             if (p.type === 'Loyer') {
-                totalDue = tenant?.rent || p.rentDue || 0;
+                totalDue = tenant?.rent || 0;
             } else if (p.type === 'Caution') {
-                totalDue = tenant?.depositAmount || p.rentDue || 0;
+                totalDue = tenant?.depositAmount || 0;
             }
 
             groups[groupKey] = {
@@ -183,7 +183,11 @@ export default function PaymentsPage() {
         // Sort individual payments within the group by date
         group.payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         return group;
-    }).sort((a,b) => new Date(b.payments[0]?.date).getTime() - new Date(a.payments[0]?.date).getTime());
+    }).sort((a,b) => {
+      const dateA = a.payments[0]?.date ? new Date(a.payments[0].date) : new Date(0);
+      const dateB = b.payments[0]?.date ? new Date(b.payments[0].date) : new Date(0);
+      return dateB.getTime() - dateA.getTime();
+    });
   }, [payments, tenants]);
   
   const resetDialog = () => {
@@ -207,7 +211,7 @@ export default function PaymentsPage() {
     }
     
     const rentDue = currentPayment.type === 'Loyer' ? tenant.rent : tenant.depositAmount;
-    const period = currentPayment.type === 'Loyer' ? currentPayment.period : 'Caution';
+    const period = currentPayment.type === 'Loyer' && currentPayment.period ? currentPayment.period : 'Caution';
 
     try {
       const paymentData = {
@@ -516,7 +520,7 @@ export default function PaymentsPage() {
                     onValueChange={(value: 'Loyer' | 'Caution') => {
                         const tenant = tenants.find(t => t.id === currentPayment.tenantId);
                         const amount = tenant ? (value === 'Loyer' ? tenant.rent : tenant.depositAmount) : 0;
-                        const period = value === 'Loyer' ? recentPeriods[0] : 'Caution';
+                        const period = value === 'Loyer' ? (recentPeriods[0] || '') : 'Caution';
                         setCurrentPayment({ ...currentPayment, type: value, amount: amount || 0, period });
                     }}
                     value={currentPayment.type}
