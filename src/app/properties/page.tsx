@@ -211,7 +211,8 @@ export default function PropertiesPage() {
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {properties.map((prop) => {
                   const totalCharges = calculateTotalCharges(prop);
-                  const totalRent = prop.baseRent + totalCharges;
+                  const baseRent = prop.baseRent || 0;
+                  const totalRent = baseRent + totalCharges;
                   return (
                   <Card key={prop.id} className="overflow-hidden">
                     <div className="relative h-48 w-full">
@@ -228,7 +229,7 @@ export default function PropertiesPage() {
                         <div>
                             <p className="font-semibold">{prop.address}</p>
                             <p className="text-primary font-bold text-lg">{totalRent.toFixed(2)} € / mois</p>
-                            <p className="text-xs text-muted-foreground">Loyer: {prop.baseRent.toFixed(2)}€ + Charges: {totalCharges.toFixed(2)}€</p>
+                            <p className="text-xs text-muted-foreground">Loyer: {baseRent.toFixed(2)}€ + Charges: {totalCharges.toFixed(2)}€</p>
                         </div>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
