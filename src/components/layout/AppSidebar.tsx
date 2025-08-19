@@ -1,3 +1,4 @@
+
 'use client';
 
 import { usePathname } from 'next/navigation';
@@ -22,6 +23,7 @@ import {
   Settings,
   Euro,
   Building,
+  TrendingUp,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -33,9 +35,10 @@ const AppSidebar = () => {
     { href: '/properties', label: 'Propriétés', icon: Building },
     { href: '/payments', label: 'Paiements', icon: Euro },
     { href: '/documents', label: 'Documents', icon: FileText },
-    { href: '/reports', label: 'Rapports', icon: BarChart3 },
-    { href: '/analysis', label: 'Analyse du marché', icon: Bot },
     { href: '/reminders', label: 'Rappels', icon: Bell },
+    { href: '/reports', label: 'Rapports', icon: BarChart3 },
+    { href: '/analysis', label: 'Analyse IA', icon: Bot },
+    { href: '/indexing', label: 'Indexation', icon: TrendingUp },
   ];
 
   return (
@@ -67,8 +70,8 @@ const AppSidebar = () => {
       <SidebarFooter>
         <SidebarMenu>
             <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Paramètres">
-                  <Link href="#">
+                <SidebarMenuButton asChild tooltip="Paramètres" isActive={pathname === '/settings'}>
+                  <Link href="/settings">
                     <Settings />
                     <span>Paramètres</span>
                   </Link>

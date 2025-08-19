@@ -1,4 +1,14 @@
 
+
+export type OwnerInfo = {
+  name: string;
+  address: string;
+  phone?: string;
+  email?: string;
+  bankAccount?: string;
+  companyNumber?: string;
+}
+
 export type Tenant = {
   id: string;
   firstName: string;
@@ -15,6 +25,8 @@ export type Tenant = {
   status: string;
   idCardUrl: string;
   idCardPath: string;
+  rent: number;
+  paymentDueDay: number;
 };
 
 export type Property = {
@@ -37,6 +49,7 @@ export type Payment = {
   amount: number;
   status: string;
   period: string;
+  rentDue: number;
 };
 
 export type Reminder = {

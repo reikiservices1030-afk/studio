@@ -43,7 +43,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { db } from "@/lib/firebase";
 import { ref, onValue, push } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
-import type { Tenant as TenantType, Payment } from '@/types';
+import type { Tenant as TenantType, Payment, OwnerInfo } from '@/types';
 
 
 const WhatsappIcon = () => (
@@ -67,6 +67,7 @@ const WhatsappIcon = () => (
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [tenants, setTenants] = useState<TenantType[]>([]);
+  const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAddPaymentOpen, setIsAddPaymentOpen] = useState(false);
   const [newPayment, setNewPayment] = useState({
@@ -104,9 +105,15 @@ export default function PaymentsPage() {
       setTenants(tenantsData);
     });
 
+    const ownerInfoRef = ref(db, 'ownerInfo');
+    const unsubOwner = onValue(ownerInfoRef, (snapshot) => {
+      setOwnerInfo(snapshot.val());
+    });
+
     return () => {
       unsubPayments();
       unsubTenants();
+      unsubOwner();
     };
   }, []);
 
@@ -129,6 +136,7 @@ export default function PaymentsPage() {
         amount: parseFloat(newPayment.amount),
         status: newPayment.status,
         period: newPayment.period,
+        rentDue: tenant.rent,
       });
       setIsAddPaymentOpen(false);
       setNewPayment({
@@ -146,7 +154,13 @@ export default function PaymentsPage() {
   };
 
   const getReceiptText = (payment: Payment) => {
-    return `Bonjour ${payment.tenantFirstName} ${payment.tenantLastName},\n\nVoici votre reçu pour le loyer de ${payment.period}.\n\n- Montant : ${payment.amount.toFixed(2)} €\n- Date de paiement : ${payment.date}\n- Propriété : ${payment.property}\n\nCordialement.`;
+    const balance = payment.rentDue - payment.amount;
+    let balanceText = `Solde restant pour ${payment.period}: ${balance.toFixed(2)} €`;
+    if (balance <= 0) {
+      balanceText = "Ce paiement solde la période.";
+    }
+
+    return `Bonjour ${payment.tenantFirstName} ${payment.tenantLastName},\n\nVoici votre reçu pour le loyer de ${payment.period}.\n\n- Montant payé : ${payment.amount.toFixed(2)} €\n- Loyer dû : ${payment.rentDue.toFixed(2)} €\n- Date de paiement : ${payment.date}\n- Propriété : ${payment.property}\n\n${balanceText}\n\nCordialement,\n${ownerInfo?.name || ''}`;
   }
 
   const handleSendReceipt = (payment: Payment) => {
@@ -171,6 +185,9 @@ export default function PaymentsPage() {
   };
 
   const handlePrintReceipt = (payment: Payment) => {
+    const balance = payment.rentDue - payment.amount;
+    const balanceText = balance > 0 ? `<tr><th>Solde restant:</th><td>${balance.toFixed(2)} €</td></tr>` : '<tr><td colspan="2" style="text-align:center; font-weight:bold;">Paiement complet</td></tr>';
+
      const receiptContent = `
       <html>
         <head>
@@ -178,13 +195,16 @@ export default function PaymentsPage() {
           <style>
             body { font-family: Arial, sans-serif; margin: 0; padding: 2rem; color: #333; }
             .container { border: 1px solid #eee; padding: 2rem; border-radius: 10px; max-width: 800px; margin: auto; }
-            .header { text-align: center; border-bottom: 1px solid #eee; padding-bottom: 1rem; }
+            .header { text-align: center; border-bottom: 1px solid #eee; padding-bottom: 1rem; margin-bottom: 2rem;}
             .header h1 { margin: 0; color: #000; }
             .header p { margin: 0; color: #555; }
+            .parties { display: flex; justify-content: space-between; margin-bottom: 2rem;}
+            .party { width: 48%; }
+            .party h2 { font-size: 1rem; color: #555; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; margin-bottom: 0.5rem; }
             .details { margin: 2rem 0; }
             .details table { width: 100%; border-collapse: collapse; }
             .details th, .details td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #eee; }
-            .details th { color: #555; font-weight: normal; }
+            .details th { color: #555; font-weight: normal; width: 40%;}
             .total { text-align: right; margin-top: 2rem; }
             .total h2 { margin: 0; font-size: 1.5rem; }
             .footer { text-align: center; margin-top: 2rem; font-size: 0.8rem; color: #777; }
@@ -194,18 +214,25 @@ export default function PaymentsPage() {
           <div class="container">
             <div class="header">
               <h1>QUITTANCE DE LOYER</h1>
-              <p>Reçu pour la période de ${payment.period}</p>
+              <p>Période de ${payment.period}</p>
+            </div>
+             <div class="parties">
+                <div class="party">
+                    <h2>Bailleur</h2>
+                    <p><strong>${ownerInfo?.name || '[Nom du propriétaire]'}</strong><br>${ownerInfo?.address || '[Adresse du propriétaire]'}</p>
+                </div>
+                <div class="party">
+                    <h2>Locataire</h2>
+                    <p><strong>${payment.tenantFirstName} ${payment.tenantLastName}</strong><br>${payment.property}</p>
+                </div>
             </div>
             <div class="details">
               <table>
-                <tr><th>Propriétaire:</th><td>[Nom du propriétaire]</td></tr>
-                <tr><th>Locataire:</th><td>${payment.tenantFirstName} ${payment.tenantLastName}</td></tr>
-                <tr><th>Propriété louée:</th><td>${payment.property}</td></tr>
-                <tr><th>Date du paiement:</th><td>${payment.date}</td></tr>
+                <tr><th>Date du paiement:</th><td>${new Date(payment.date).toLocaleDateString('fr-BE')}</td></tr>
+                <tr><th>Loyer dû pour la période:</th><td>${payment.rentDue.toFixed(2)} €</td></tr>
+                <tr><th>Montant payé:</th><td><strong>${payment.amount.toFixed(2)} €</strong></td></tr>
+                ${balanceText}
               </table>
-            </div>
-            <div class="total">
-              <h2>Total payé: ${payment.amount.toFixed(2)} €</h2>
             </div>
             <div class="footer">
               <p>Ceci est un reçu généré automatiquement. Pour toute question, veuillez nous contacter.</p>
@@ -264,7 +291,9 @@ export default function PaymentsPage() {
                     <TableCell className="hidden md:table-cell">{payment.date}</TableCell>
                     <TableCell className="hidden sm:table-cell">{payment.amount.toFixed(2)} €</TableCell>
                     <TableCell>
-                      <Badge variant={payment.status === 'Payé' ? 'default' : 'destructive'}>{payment.status}</Badge>
+                      <Badge variant={payment.amount >= payment.rentDue ? 'default' : 'destructive'}>
+                        {payment.amount >= payment.rentDue ? 'Payé' : 'Partiel'}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -311,13 +340,23 @@ export default function PaymentsPage() {
           <div className="grid gap-4 py-4">
              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="tenant" className="text-right">Locataire</Label>
-                <Select onValueChange={(value) => setNewPayment({...newPayment, tenantId: value})}>
+                <Select 
+                    onValueChange={(value) => {
+                        const selectedTenant = tenants.find(t => t.id === value);
+                        setNewPayment({
+                            ...newPayment, 
+                            tenantId: value,
+                            amount: selectedTenant?.rent.toString() || ''
+                        });
+                    }}
+                    value={newPayment.tenantId}
+                >
                     <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Sélectionnez un locataire" />
                     </SelectTrigger>
                     <SelectContent>
-                        {tenants.map(t => (
-                            <SelectItem key={t.id} value={t.id}>{t.firstName} {t.lastName}</SelectItem>
+                        {tenants.filter(t => t.status === 'Actif').map(t => (
+                            <SelectItem key={t.id} value={t.id}>{t.firstName} {t.lastName} ({t.propertyName})</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>

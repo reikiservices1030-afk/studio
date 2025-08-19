@@ -52,7 +52,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { db, storage } from '@/lib/firebase';
-import { ref as dbRef, onValue, push, remove, update, set } from "firebase/database";
+import { ref as dbRef, onValue, push, remove, update, get } from "firebase/database";
 import {
   ref as storageRef,
   uploadBytes,
@@ -61,7 +61,7 @@ import {
 } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import type { Tenant, Property } from '@/types';
+import type { Tenant, Property, OwnerInfo } from '@/types';
 
 
 const WhatsappIcon = () => (
@@ -84,6 +84,7 @@ const WhatsappIcon = () => (
 export default function TenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -126,9 +127,15 @@ export default function TenantsPage() {
         setProperties(propsData);
     });
 
+     const ownerInfoRef = dbRef(db, 'ownerInfo');
+      const unsubOwner = onValue(ownerInfoRef, (snapshot) => {
+        setOwnerInfo(snapshot.val());
+      });
+
     return () => {
         unsubTenants();
         unsubProperties();
+        unsubOwner();
     };
   }, []);
 
@@ -203,12 +210,12 @@ export default function TenantsPage() {
   };
 
   const handleSave = async () => {
-    const { firstName, lastName, email, propertyId, leaseStart, leaseDuration, nationalId } = currentTenant;
-    if (!firstName || !lastName || !email || !propertyId || !leaseStart || !leaseDuration || !nationalId) {
+    const { firstName, lastName, email, propertyId, leaseStart, leaseDuration, nationalId, paymentDueDay } = currentTenant;
+    if (!firstName || !lastName || !email || !propertyId || !leaseStart || !leaseDuration || !nationalId || !paymentDueDay) {
       toast({
         variant: 'destructive',
         title: 'Erreur',
-        description: 'Veuillez remplir tous les champs obligatoires (y compris le N° National).',
+        description: 'Veuillez remplir tous les champs obligatoires.',
       });
       return;
     }
@@ -232,6 +239,11 @@ export default function TenantsPage() {
         }
 
         const selectedProperty = properties.find(p => p.id === propertyId);
+        if (!selectedProperty) {
+            toast({ variant: 'destructive', title: 'Erreur', description: 'Propriété sélectionnée invalide.' });
+            setUploading(false);
+            return;
+        }
 
         const tenantData: Omit<Tenant, 'id'> = {
             firstName: currentTenant.firstName || '',
@@ -248,11 +260,13 @@ export default function TenantsPage() {
             idCardPath,
             status: 'Actif',
             propertyName: selectedProperty?.address || 'N/A',
+            rent: selectedProperty.rent,
+            paymentDueDay: currentTenant.paymentDueDay || 1,
         };
 
         if (isEditing && currentTenant.id) {
             const tenantRef = dbRef(db, `tenants/${currentTenant.id}`);
-            await set(tenantRef, tenantData);
+            await update(tenantRef, tenantData);
             toast({ title: 'Succès', description: 'Locataire mis à jour.' });
         } else {
             const tenantsRef = dbRef(db, 'tenants');
@@ -308,42 +322,92 @@ export default function TenantsPage() {
 
   const generateLease = (tenant: Tenant) => {
     const property = properties.find(p => p.id === tenant.propertyId);
-    if (!property) {
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Propriété associée non trouvée.' });
+    if (!property || !ownerInfo) {
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Informations sur la propriété ou le propriétaire manquantes.' });
       return;
     }
 
     const leaseEndDate = new Date(tenant.leaseStart);
-    leaseEndDate.setMonth(leaseEndDate.getMonth() + tenant.leaseDuration);
-
+    leaseEndDate.setFullYear(leaseEndDate.getFullYear() + (tenant.leaseDuration / 12));
+    
     const leaseContent = `
       <html>
-        <head><title>Contrat de Bail</title><style>body { font-family: 'Times New Roman', serif; margin: 2rem; line-height: 1.6; } h1, h2 { text-align: center; } .section { margin-top: 2rem; } .signature-area { margin-top: 4rem; display: flex; justify-content: space-between; } .signature { width: 45%; border-top: 1px solid #000; padding-top: 0.5rem; }</style></head>
+        <head>
+          <title>Contrat de Bail - ${tenant.lastName}</title>
+          <style>
+            body { font-family: 'Times New Roman', serif; margin: 2rem; line-height: 1.6; font-size: 12pt; }
+            h1, h2, h3 { text-align: center; }
+            .section { margin-top: 2rem; text-align: justify; }
+            .parties, .signatures { display: flex; justify-content: space-between; margin-top: 2rem; }
+            .party, .signature { width: 48%; }
+            ul { list-style: none; padding-left: 0; }
+            li { margin-bottom: 0.5rem; }
+            strong { font-weight: bold; }
+          </style>
+        </head>
         <body>
-          <h1>CONTRAT DE BAIL RÉSIDENTIEL</h1>
-          <div class="section">
-            <h2>ENTRE LES SOUSSIGNÉS :</h2>
-            <p><strong>Le Bailleur :</strong> [Nom du propriétaire], demeurant à [Adresse du propriétaire], ci-après dénommé "le Bailleur".</p>
-            <p><strong>Le Locataire :</strong> ${tenant.firstName} ${tenant.lastName}, N° National : ${tenant.nationalId}, nationalité: ${tenant.nationality}, ci-après dénommé "le Locataire".</p>
+          <h1>CONTRAT DE BAIL DE RÉSIDENCE PRINCIPALE</h1>
+          <h3>(Loi du 20 février 1991 - Code du Logement)</h3>
+
+          <div class="section parties">
+            <div class="party">
+              <h2>ENTRE :</h2>
+              <ul>
+                <li><strong>LE BAILLEUR :</strong></li>
+                <li>${ownerInfo.name}</li>
+                <li>${ownerInfo.address}</li>
+                ${ownerInfo.companyNumber ? `<li>BCE : ${ownerInfo.companyNumber}</li>` : ''}
+              </ul>
+            </div>
+            <div class="party">
+              <h2>ET :</h2>
+              <ul>
+                <li><strong>LE PRENEUR :</strong></li>
+                <li>${tenant.firstName} ${tenant.lastName}</li>
+                <li>Né(e) le: [Date de naissance]</li>
+                <li>Nationalité : ${tenant.nationality}</li>
+                <li>N° National : ${tenant.nationalId}</li>
+              </ul>
+            </div>
           </div>
+          
           <div class="section">
             <h2>IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :</h2>
-            <p>Le Bailleur loue au Locataire, qui accepte, le bien immobilier suivant :</p>
+            <p>Le Bailleur loue au Preneur, qui accepte, le bien immobilier suivant :</p>
             <p><strong>Désignation du bien :</strong> ${property.address}</p>
-            <p><strong>Usage du bien :</strong> Le bien est loué à usage exclusif d'habitation principale.</p>
+            <p>Le bien est loué à usage exclusif d'habitation principale, le Preneur déclare bien connaître les lieux pour les avoir vus et visités.</p>
           </div>
+
           <div class="section">
-            <h2>DURÉE DU BAIL</h2>
-            <p>Le présent bail est consenti pour une durée de ${tenant.leaseDuration} mois, à compter du ${new Date(tenant.leaseStart).toLocaleDateString('fr-BE')} pour se terminer le ${leaseEndDate.toLocaleDateString('fr-BE')}, sauf reconduction ou résiliation anticipée.</p>
+            <h2>Article 1 : Durée</h2>
+            <p>Le présent bail est consenti pour une durée de ${tenant.leaseDuration} mois, prenant cours le ${new Date(tenant.leaseStart).toLocaleDateString('fr-BE')} pour se terminer le ${leaseEndDate.toLocaleDateString('fr-BE')}.</p>
           </div>
+
+          <div class="section">
+            <h2>Article 2 : Loyer</h2>
+            <p>Le loyer mensuel est fixé à <strong>${property.rent.toFixed(2)} €</strong> (euros), payable par virement anticipativement pour le ${tenant.paymentDueDay} de chaque mois sur le compte bancaire du bailleur : ${ownerInfo.bankAccount || '[IBAN du bailleur]'}.</p>
+            <p>Le loyer sera indexé annuellement à la date anniversaire du bail, sur base de l'indice santé, conformément à la législation en vigueur.</p>
+          </div>
+
            <div class="section">
-            <h2>LOYER ET CHARGES</h2>
-            <p>Le loyer mensuel est fixé à ${property.rent.toFixed(2)} € (${property.rent} euros), payable par le Locataire au Bailleur avant le 5 de chaque mois.</p>
-            <p>En sus du loyer, le Locataire s'acquittera d'une provision sur charges mensuelle de [Montant des charges] €.</p>
+            <h2>Article 3 : Garantie locative</h2>
+            <p>Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer, soit ${(property.rent * 2).toFixed(2)} €. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.</p>
           </div>
-          <div class="signature-area">
-            <div class="signature">Fait à Bruxelles, le ${new Date().toLocaleDateString('fr-BE')}<br/><br/><strong>Le Bailleur</strong></div>
-            <div class="signature">Fait à Bruxelles, le ${new Date().toLocaleDateString('fr-BE')}<br/><br/><strong>Le Locataire</strong></div>
+
+          <div class="section signatures">
+            <div class="signature">
+                <p>Fait à Bruxelles, le ${new Date().toLocaleDateString('fr-BE')}, en deux exemplaires, chaque partie reconnaissant avoir reçu le sien.</p>
+                <br/><br/>
+                <strong>LE BAILLEUR</strong>
+                <br/><br/>
+                (Signature)
+            </div>
+            <div class="signature">
+                <br/><br/><br/><br/><br/><br/>
+                <strong>LE PRENEUR</strong>
+                <br/><br/>
+                (Signature)
+            </div>
           </div>
         </body>
       </html>
@@ -357,7 +421,7 @@ export default function TenantsPage() {
   return (
     <div className="flex flex-col h-full">
       <Header title="Locataires">
-        <Button size="sm" className="gap-1" onClick={() => { setIsEditing(false); setCurrentTenant({}); setIsDialogOpen(true); }}>
+        <Button size="sm" className="gap-1" onClick={() => { setIsEditing(false); setCurrentTenant({paymentDueDay: 1}); setIsDialogOpen(true); }}>
           <PlusCircle className="h-3.5 w-3.5" />
           Ajouter un locataire
         </Button>
@@ -444,6 +508,10 @@ export default function TenantsPage() {
                 <div className="space-y-2"><Label>Durée du bail (mois)</Label><Input type="number" value={currentTenant.leaseDuration || ''} onChange={(e) => setCurrentTenant({...currentTenant, leaseDuration: Number(e.target.value)})} /></div>
             </div>
             <div className="space-y-2">
+              <Label>Jour du mois pour le paiement du loyer</Label>
+              <Input type="number" min="1" max="28" value={currentTenant.paymentDueDay || ''} onChange={(e) => setCurrentTenant({...currentTenant, paymentDueDay: Number(e.target.value)})} />
+            </div>
+            <div className="space-y-2">
                 <Label>Carte d'identité</Label>
                 <div className="flex gap-2">
                     <Button variant="outline" className="w-full" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Télécharger</Button>
@@ -463,7 +531,7 @@ export default function TenantsPage() {
       
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
           <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader><DialogTitle>Détails du locataire</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>Détails du locataire</DialogTitle><DialogDescription>Informations complètes sur le locataire.</DialogDescription></DialogHeader>
               {currentTenant && (
                   <div className="grid gap-4 py-4 text-sm max-h-[60vh] overflow-y-auto pr-4">
                       {currentTenant.idCardUrl && <div className="relative w-full h-48 mb-4"><Image src={currentTenant.idCardUrl} alt="ID Card" layout="fill" className="rounded-md object-contain mx-auto" /></div>}
@@ -474,6 +542,8 @@ export default function TenantsPage() {
                       <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Nationalité:</div><div className="col-span-2 font-medium">{currentTenant.nationality}</div></div>
                       <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Compte bancaire:</div><div className="col-span-2 font-medium">{currentTenant.bankAccount}</div></div>
                       <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Propriété:</div><div className="col-span-2 font-medium">{currentTenant.propertyName}</div></div>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Loyer:</div><div className="col-span-2 font-medium">{currentTenant.rent?.toFixed(2)} €</div></div>
+                      <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Paiement le:</div><div className="col-span-2 font-medium">{currentTenant.paymentDueDay} du mois</div></div>
                       <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Début du bail:</div><div className="col-span-2 font-medium">{currentTenant.leaseStart}</div></div>
                       <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Durée:</div><div className="col-span-2 font-medium">{currentTenant.leaseDuration} mois</div></div>
                       <div className="grid grid-cols-3 gap-2"><div className="text-muted-foreground">Statut:</div><div className="col-span-2 font-medium"><Badge variant={currentTenant.status === 'Actif' ? 'secondary' : 'destructive'}>{currentTenant.status}</Badge></div></div>
