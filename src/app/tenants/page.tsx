@@ -775,7 +775,7 @@ export default function TenantsPage() {
             {currentTenant.propertyId && (
                 <div className="space-y-2">
                     <Label>Caution (2 mois de loyer)</Label>
-                    <Input value={`${currentTenant.depositAmount?.toFixed(2) || '0.00'} €`} disabled />
+                    <Input value={currentTenant.depositAmount ? `${currentTenant.depositAmount.toFixed(2)} €` : '0.00 €'} disabled />
                 </div>
             )}
              <div className="grid grid-cols-2 gap-4">
@@ -866,7 +866,7 @@ export default function TenantsPage() {
                 <div className="grid grid-cols-2 gap-6">
                     <div>
                         <Label>Montant de la caution</Label>
-                        <Input value={`${currentTenant.depositAmount?.toFixed(2) || '0.00'} €`} disabled />
+                        <Input value={currentTenant.depositAmount ? `${currentTenant.depositAmount.toFixed(2)} €` : '0.00 €'} disabled />
                     </div>
                     <div>
                         <Label>Statut de la caution</Label>
@@ -947,7 +947,7 @@ export default function TenantsPage() {
                 <div className="space-y-3 rounded-lg bg-muted/50 p-4">
                     <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Caution initiale:</span>
-                        <span className="font-medium">{currentTenant.depositAmount?.toFixed(2) || '0.00'} €</span>
+                        <span className="font-medium">{currentTenant.depositAmount ? `${currentTenant.depositAmount.toFixed(2)} €` : '0.00 €'}</span>
                     </div>
                      <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Total déductions:</span>
@@ -989,4 +989,3 @@ export default function TenantsPage() {
     </div>
   );
 }
-
