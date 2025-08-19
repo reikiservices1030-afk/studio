@@ -5,7 +5,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/layout/AppSidebar';
 
 export const metadata: Metadata = {
-  title: 'Rentify',
+  title: 'BelgoRent',
   description: 'Modern rental management',
 };
 
