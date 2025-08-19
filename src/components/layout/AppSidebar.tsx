@@ -24,6 +24,7 @@ import {
   Euro,
   Building,
   TrendingUp,
+  Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -34,6 +35,7 @@ const AppSidebar = () => {
     { href: '/tenants', label: 'Locataires', icon: Users },
     { href: '/properties', label: 'Propriétés', icon: Building },
     { href: '/payments', label: 'Paiements', icon: Euro },
+    { href: '/maintenance', label: 'Maintenance', icon: Wrench },
     { href: '/documents', label: 'Documents', icon: FileText },
     { href: '/reminders', label: 'Rappels', icon: Bell },
     { href: '/reports', label: 'Rapports', icon: BarChart3 },

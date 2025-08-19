@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ import {
   Trash2,
   ShieldCheck,
   Mail,
+  Wrench,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -52,9 +53,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { db, storage } from '@/lib/firebase';
-import { ref as dbRef, onValue, push, remove, update } from "firebase/database";
+import { ref as dbRef, onValue, push, remove, update, query, orderByChild, equalTo } from "firebase/database";
 import {
   ref as storageRef,
   uploadBytes,
@@ -63,7 +65,7 @@ import {
 } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import type { Tenant, Property, OwnerInfo } from '@/types';
+import type { Tenant, Property, OwnerInfo, Maintenance } from '@/types';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Separator } from '@/components/ui/separator';
@@ -90,6 +92,8 @@ export default function TenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null);
+  const [tenantMaintenances, setTenantMaintenances] = useState<Maintenance[]>([]);
+  const [selectedRepairs, setSelectedRepairs] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -106,6 +110,21 @@ export default function TenantsPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { toast } = useToast();
+  
+  const totalDeductions = useMemo(() => {
+    return tenantMaintenances.reduce((total, repair) => {
+        if (selectedRepairs[repair.id]) {
+            return total + repair.cost;
+        }
+        return total;
+    }, 0);
+  }, [selectedRepairs, tenantMaintenances]);
+
+  const finalRefundAmount = useMemo(() => {
+      const deposit = currentTenant?.depositAmount || 0;
+      return deposit - totalDeductions;
+  }, [currentTenant, totalDeductions]);
+
 
   useEffect(() => {
     const tenantsRef = dbRef(db, 'tenants');
@@ -320,16 +339,51 @@ export default function TenantsPage() {
   
   const openDepositDialog = (tenant: Tenant) => {
     setCurrentTenant(tenant);
+    
+    // Fetch maintenances for this tenant
+    const maintenancesQuery = query(ref(db, 'maintenances'), orderByChild('tenantId'), equalTo(tenant.id));
+    onValue(maintenancesQuery, (snapshot) => {
+        const data: Maintenance[] = [];
+        snapshot.forEach(child => data.push({id: child.key!, ...child.val()}));
+        setTenantMaintenances(data);
+        
+        // Pre-select repairs that were already marked as deducted
+        const alreadyDeducted = data.reduce((acc, item) => {
+            if(item.deductedFromDeposit) {
+                acc[item.id] = true;
+            }
+            return acc;
+        }, {} as Record<string, boolean>);
+        setSelectedRepairs(alreadyDeducted);
+
+    }, { onlyOnce: true });
+
     setIsDepositOpen(true);
   };
   
   const handleDepositSave = async () => {
     if (!currentTenant.id || !currentTenant.depositStatus) return;
     try {
-        const tenantRef = dbRef(db, `tenants/${currentTenant.id}`);
-        await update(tenantRef, { depositStatus: currentTenant.depositStatus });
+        const updates: any = {};
+        updates[`tenants/${currentTenant.id}/depositStatus`] = currentTenant.depositStatus;
+
+        // Update maintenance items
+        tenantMaintenances.forEach(repair => {
+            const wasDeducted = repair.deductedFromDeposit;
+            const isDeducted = selectedRepairs[repair.id] || false;
+            if(wasDeducted !== isDeducted) {
+                updates[`maintenances/${repair.id}/deductedFromDeposit`] = isDeducted;
+            }
+        });
+
+        await update(ref(db), updates);
+
         toast({ title: 'Succès', description: 'Statut de la caution mis à jour.' });
         setIsDepositOpen(false);
+        setCurrentTenant({});
+        setTenantMaintenances([]);
+        setSelectedRepairs({});
+
     } catch(error) {
         console.error('Error updating deposit status:', error);
         toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de mettre à jour le statut.' });
@@ -635,7 +689,7 @@ export default function TenantsPage() {
                         <h4 className="font-semibold">Informations sur le Bail</h4>
                         <div className="grid grid-cols-[120px_1fr] gap-x-4 gap-y-2">
                           <div className="text-muted-foreground">Propriété</div><div className="font-medium">{currentTenant.propertyName}</div>
-                          <div className="text-muted-foreground">Loyer</div><div className="font-medium">{currentTenant.rent?.toFixed(2)} €</div>
+                          <div className="text-muted-foreground">Loyer</div><div className="font-medium">{currentTenant.rent?.toFixed(2) || 'N/A'} €</div>
                           <div className="text-muted-foreground">Paiement le</div><div className="font-medium">{currentTenant.paymentDueDay} du mois</div>
                           <div className="text-muted-foreground">Début du bail</div><div className="font-medium">{currentTenant.leaseStart}</div>
                           <div className="text-muted-foreground">Durée</div><div className="font-medium">{currentTenant.leaseDuration} mois</div>
@@ -648,7 +702,7 @@ export default function TenantsPage() {
                       <div className="space-y-2">
                         <h4 className="font-semibold">Garantie Locative (Caution)</h4>
                         <div className="grid grid-cols-[120px_1fr] gap-x-4 gap-y-2">
-                            <div className="text-muted-foreground">Montant</div><div className="font-medium">{currentTenant.depositAmount?.toFixed(2)} €</div>
+                            <div className="text-muted-foreground">Montant</div><div className="font-medium">{currentTenant.depositAmount?.toFixed(2) || 'N/A'} €</div>
                             <div className="text-muted-foreground">Statut</div><div><Badge>{currentTenant.depositStatus}</Badge></div>
                         </div>
                       </div>
@@ -659,31 +713,81 @@ export default function TenantsPage() {
       </Dialog>
       
       <Dialog open={isDepositOpen} onOpenChange={setIsDepositOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
                 <DialogTitle>Gérer la caution</DialogTitle>
                 <DialogDescription>Mettre à jour le statut de la caution pour {currentTenant.firstName} {currentTenant.lastName}.</DialogDescription>
             </DialogHeader>
-            <div className="py-4 space-y-4">
-                <div>
-                    <Label>Montant de la caution</Label>
-                    <Input value={`${currentTenant.depositAmount?.toFixed(2) || '0.00'} €`} disabled />
+            <div className="py-4 space-y-6 max-h-[60vh] overflow-y-auto pr-4">
+                <div className="grid grid-cols-2 gap-6">
+                    <div>
+                        <Label>Montant de la caution</Label>
+                        <Input value={`${currentTenant.depositAmount?.toFixed(2) || '0.00'} €`} disabled />
+                    </div>
+                    <div>
+                        <Label>Statut de la caution</Label>
+                         <Select 
+                            value={currentTenant.depositStatus} 
+                            onValueChange={(value) => setCurrentTenant({...currentTenant, depositStatus: value as Tenant['depositStatus']})}
+                        >
+                            <SelectTrigger><SelectValue/></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Non payé">Non payé</SelectItem>
+                                <SelectItem value="Payé">Payé</SelectItem>
+                                <SelectItem value="Remboursé">Remboursé</SelectItem>
+                                <SelectItem value="Partiellement remboursé">Partiellement remboursé</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
+                
+                <Separator/>
+
                 <div>
-                    <Label>Statut de la caution</Label>
-                     <Select 
-                        value={currentTenant.depositStatus} 
-                        onValueChange={(value) => setCurrentTenant({...currentTenant, depositStatus: value as Tenant['depositStatus']})}
-                    >
-                        <SelectTrigger><SelectValue/></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Non payé">Non payé</SelectItem>
-                            <SelectItem value="Payé">Payé</SelectItem>
-                            <SelectItem value="Remboursé">Remboursé</SelectItem>
-                            <SelectItem value="Partiellement remboursé">Partiellement remboursé</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Wrench className="h-4 w-4"/> Déductions pour réparations
+                    </h4>
+                    {tenantMaintenances.length > 0 ? (
+                        <div className="space-y-2 rounded-md border p-2">
+                            {tenantMaintenances.map(repair => (
+                                <div key={repair.id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md">
+                                    <div className="flex items-center gap-3">
+                                        <Checkbox 
+                                            id={`repair-${repair.id}`} 
+                                            checked={selectedRepairs[repair.id] || false}
+                                            onCheckedChange={(checked) => setSelectedRepairs(prev => ({...prev, [repair.id]: !!checked}))}
+                                        />
+                                        <label htmlFor={`repair-${repair.id}`} className="text-sm">
+                                            <p className="font-medium">{repair.description}</p>
+                                            <p className="text-xs text-muted-foreground">{repair.date}</p>
+                                        </label>
+                                    </div>
+                                    <span className="font-semibold text-sm">{repair.cost.toFixed(2)} €</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">Aucune réparation n'est associée à ce locataire.</p>
+                    )}
                 </div>
+
+                <Separator />
+
+                <div className="space-y-3 rounded-lg bg-muted/50 p-4">
+                    <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Caution initiale:</span>
+                        <span className="font-medium">{currentTenant.depositAmount?.toFixed(2) || '0.00'} €</span>
+                    </div>
+                     <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total déductions:</span>
+                        <span className="font-medium text-destructive">- {totalDeductions.toFixed(2)} €</span>
+                    </div>
+                    <div className="flex justify-between text-lg font-bold border-t pt-3 mt-3">
+                        <span>Montant final à rembourser:</span>
+                        <span className="text-primary">{finalRefundAmount.toFixed(2)} €</span>
+                    </div>
+                </div>
+
             </div>
             <DialogFooter>
                 <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>

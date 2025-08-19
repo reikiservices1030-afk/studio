@@ -2,6 +2,7 @@
 
 
 
+
 export type OwnerInfo = {
   name: string;
   address: string;
@@ -75,6 +76,18 @@ export type Document = {
   uploaded: string;
   url: string;
   path: string;
+};
+
+export type Maintenance = {
+    id: string;
+    propertyId: string;
+    propertyName: string;
+    tenantId?: string;
+    tenantName?: string;
+    date: string;
+    description: string;
+    cost: number;
+    deductedFromDeposit?: boolean;
 };
 
 export type GroupedPayment = {
