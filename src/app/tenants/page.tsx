@@ -34,6 +34,7 @@ import {
   ShieldCheck,
   Mail,
   Wrench,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -41,6 +42,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -65,7 +67,7 @@ import {
 } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import type { Tenant, Property, OwnerInfo, Maintenance } from '@/types';
+import type { Tenant, Property, OwnerInfo, Maintenance, Payment, GroupedPayment } from '@/types';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Separator } from '@/components/ui/separator';
@@ -92,8 +94,10 @@ export default function TenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [tenantMaintenances, setTenantMaintenances] = useState<Maintenance[]>([]);
   const [selectedRepairs, setSelectedRepairs] = useState<Record<string, boolean>>({});
+  const [selectedUnpaid, setSelectedUnpaid] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -110,15 +114,53 @@ export default function TenantsPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { toast } = useToast();
+
+  const unpaidRents = useMemo(() => {
+    if (!currentTenant.id) return [];
+    const tenantPayments = payments.filter(p => p.tenantId === currentTenant.id && p.type === 'Loyer');
+    const groups: { [key: string]: GroupedPayment } = {};
+    
+    tenantPayments.forEach(p => {
+        const groupKey = p.period;
+        if (!groups[groupKey]) {
+            groups[groupKey] = {
+                groupKey,
+                tenantId: p.tenantId,
+                tenantFirstName: p.tenantFirstName,
+                tenantLastName: p.tenantLastName,
+                property: p.property,
+                type: 'Loyer',
+                period: p.period,
+                totalDue: p.rentDue,
+                totalPaid: 0,
+                status: '',
+                payments: [],
+            };
+        }
+        if (p.status === 'Payé') {
+            groups[groupKey].totalPaid += p.amount;
+        }
+    });
+
+    return Object.values(groups).filter(g => g.totalPaid < g.totalDue);
+  }, [currentTenant.id, payments]);
+
   
   const totalDeductions = useMemo(() => {
-    return tenantMaintenances.reduce((total, repair) => {
+    const repairDeductions = tenantMaintenances.reduce((total, repair) => {
         if (selectedRepairs[repair.id]) {
             return total + repair.cost;
         }
         return total;
     }, 0);
-  }, [selectedRepairs, tenantMaintenances]);
+    const unpaidDeductions = unpaidRents.reduce((total, rent) => {
+        if(selectedUnpaid[rent.groupKey]){
+            return total + (rent.totalDue - rent.totalPaid);
+        }
+        return total;
+    }, 0);
+    return repairDeductions + unpaidDeductions;
+  }, [selectedRepairs, tenantMaintenances, selectedUnpaid, unpaidRents]);
 
   const finalRefundAmount = useMemo(() => {
       const deposit = currentTenant?.depositAmount || 0;
@@ -156,11 +198,19 @@ export default function TenantsPage() {
       const unsubOwner = onValue(ownerInfoRef, (snapshot) => {
         setOwnerInfo(snapshot.val());
       });
+    
+     const paymentsRef = dbRef(db, 'payments');
+     const unsubPayments = onValue(paymentsRef, (snapshot) => {
+         const data: Payment[] = [];
+         snapshot.forEach(child => data.push({id: child.key!, ...child.val()}));
+         setPayments(data);
+     });
 
     return () => {
         unsubTenants();
         unsubProperties();
         unsubOwner();
+        unsubPayments();
     };
   }, []);
 
@@ -283,7 +333,7 @@ export default function TenantsPage() {
             leaseDuration: currentTenant.leaseDuration || 0,
             idCardUrl,
             idCardPath,
-            status: 'Actif',
+            status: currentTenant.status || 'Actif',
             propertyName: selectedProperty?.address || 'N/A',
             rent: selectedProperty.rent,
             paymentDueDay: currentTenant.paymentDueDay || 1,
@@ -531,10 +581,92 @@ export default function TenantsPage() {
     }
   };
 
+  const generateNoticeToQuit = async (tenant: Tenant) => {
+    const property = properties.find(p => p.id === tenant.propertyId);
+    if (!property || !ownerInfo) {
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Informations sur la propriété ou le propriétaire manquantes.' });
+      return;
+    }
+    
+    const tenantUnpaidRents = unpaidRents.filter(rent => rent.tenantId === tenant.id);
+    const totalArrears = tenantUnpaidRents.reduce((acc, rent) => acc + (rent.totalDue - rent.totalPaid), 0);
+    const arrearsDetails = tenantUnpaidRents.map(rent => ` - ${rent.period}: ${(rent.totalDue - rent.totalPaid).toFixed(2)} €`).join('\n');
+
+    if (tenantUnpaidRents.length < 2) {
+      toast({ variant: 'destructive', title: 'Action non requise', description: 'Une mise en demeure est généralement envoyée après 2 mois de loyers impayés.' });
+      return;
+    }
+    
+    const noticeContent = `
+      <html>
+        <head><title>Mise en Demeure</title>
+          <style>
+            body { font-family: 'Times New Roman', serif; margin: 2rem; line-height: 1.6; font-size: 12pt; }
+            .container { max-width: 800px; margin: auto; }
+            .sender-info { text-align: left; }
+            .recipient-info { text-align: right; margin: 2rem 0; }
+            .content { text-align: justify; }
+            .bold { font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="sender-info">
+                <p class="bold">${ownerInfo.name}</p>
+                <p>${ownerInfo.address}</p>
+            </div>
+            <div class="recipient-info">
+                <p class="bold">${tenant.firstName} ${tenant.lastName}</p>
+                <p>${property.address}</p>
+            </div>
+            <p>Fait à [Ville], le ${new Date().toLocaleDateString('fr-BE')}</p>
+            <br/>
+            <p><span class="bold">OBJET : Mise en demeure pour non-paiement de loyer</span></p>
+            <p><span class="bold">Lettre Recommandée avec Accusé de Réception</span></p>
+            <br/>
+            <p>Madame, Monsieur,</p>
+            <div class="content">
+                <p>Sauf erreur ou omission de notre part, nous constatons qu'à ce jour, vous n'avez pas réglé les loyers et charges dus pour le logement que vous occupez, situé à l'adresse suivante : ${property.address}.</p>
+                <p>Le montant total des arriérés s'élève à ce jour à <span class="bold">${totalArrears.toFixed(2)} €</span>, correspondant aux périodes suivantes :</p>
+                <pre>${arrearsDetails}</pre>
+                <p>Nous vous mettons donc en demeure de régulariser votre situation en nous faisant parvenir la somme de <span class="bold">${totalArrears.toFixed(2)} €</span> sous un délai de 8 jours à compter de la réception de la présente.</p>
+                <p>À défaut de paiement dans le délai imparti, nous nous verrons contraints d'engager une procédure judiciaire à votre encontre afin d'obtenir le recouvrement des sommes dues et la résiliation du bail, avec toutes les conséquences que cela implique (frais de justice, expulsion, etc.).</p>
+                <p>Dans l'attente de votre règlement, nous vous prions d'agréer, Madame, Monsieur, l'expression de nos salutations distinguées.</p>
+            </div>
+            <br/><br/>
+            <p>Signature</p>
+            <br/>
+            <p>${ownerInfo.name}</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const printContainer = document.createElement('div');
+    printContainer.innerHTML = noticeContent;
+    document.body.appendChild(printContainer);
+    
+    try {
+      toast({ title: "Génération du PDF...", description: "Veuillez patienter." });
+      const canvas = await html2canvas(printContainer.querySelector('.container') as HTMLElement);
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`MiseEnDemeure-${tenant.lastName}.pdf`);
+      toast({ title: "Succès", description: "Mise en demeure téléchargée." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erreur", description: "Impossible de générer le document." });
+    } finally {
+      document.body.removeChild(printContainer);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <Header title="Locataires">
-        <Button size="sm" className="gap-1" onClick={() => { setIsEditing(false); setCurrentTenant({paymentDueDay: 1, depositStatus: 'Non payé'}); setIsDialogOpen(true); }}>
+        <Button size="sm" className="gap-1" onClick={() => { setIsEditing(false); setCurrentTenant({paymentDueDay: 1, depositStatus: 'Non payé', status: 'Actif'}); setIsDialogOpen(true); }}>
           <PlusCircle className="h-3.5 w-3.5" />
           Ajouter un locataire
         </Button>
@@ -578,6 +710,8 @@ export default function TenantsPage() {
                             <DropdownMenuItem onClick={() => openDepositDialog(tenant)}><ShieldCheck className="mr-2 h-4 w-4" />Gérer la caution</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openEditDialog(tenant)}><Edit className="mr-2 h-4 w-4" />Modifier</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => generateLease(tenant)}><FileText className="mr-2 h-4 w-4" />Télécharger le bail</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => generateNoticeToQuit(tenant)} className="text-amber-600 focus:text-amber-700"><AlertTriangle className="mr-2 h-4 w-4"/>Générer une mise en demeure</DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(tenant)}><Trash2 className="mr-2 h-4 w-4"/>Supprimer</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -602,6 +736,16 @@ export default function TenantsPage() {
                 <div className="space-y-2"><Label>Prénom</Label><Input value={currentTenant.firstName || ''} onChange={(e) => setCurrentTenant({...currentTenant, firstName: e.target.value})} /></div>
                 <div className="space-y-2"><Label>Nom</Label><Input value={currentTenant.lastName || ''} onChange={(e) => setCurrentTenant({...currentTenant, lastName: e.target.value})} /></div>
             </div>
+             <div className="space-y-2">
+                <Label>Statut</Label>
+                <Select value={currentTenant.status} onValueChange={(value) => setCurrentTenant({...currentTenant, status: value})}>
+                    <SelectTrigger><SelectValue/></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Actif">Actif</SelectItem>
+                        <SelectItem value="Inactif">Inactif</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
             <div className="space-y-2"><Label>Email</Label><Input type="email" value={currentTenant.email || ''} onChange={(e) => setCurrentTenant({...currentTenant, email: e.target.value})} /></div>
             <div className="space-y-2"><Label>Téléphone</Label><Input type="tel" value={currentTenant.phone || ''} onChange={(e) => setCurrentTenant({...currentTenant, phone: e.target.value})} /></div>
             <div className="grid grid-cols-2 gap-4">
@@ -624,7 +768,7 @@ export default function TenantsPage() {
                 >
                     <SelectTrigger><SelectValue placeholder="Sélectionnez une propriété" /></SelectTrigger>
                     <SelectContent>
-                        {properties.map(p => (<SelectItem key={p.id} value={p.id}>{p.address} - {p.rent}€</SelectItem>))}
+                        {properties.filter(p => !tenants.some(t => t.propertyId === p.id && t.status === 'Actif' && t.id !== currentTenant.id)).map(p => (<SelectItem key={p.id} value={p.id}>{p.address} - {p.rent}€</SelectItem>))}
                     </SelectContent>
                 </Select>
             </div>
@@ -743,6 +887,33 @@ export default function TenantsPage() {
                 
                 <Separator/>
 
+                 <div>
+                    <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-500"/> Loyers impayés
+                    </h4>
+                     {unpaidRents.length > 0 ? (
+                        <div className="space-y-2 rounded-md border p-2">
+                             {unpaidRents.map(rent => (
+                                <div key={rent.groupKey} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md">
+                                    <div className="flex items-center gap-3">
+                                        <Checkbox 
+                                            id={`rent-${rent.groupKey}`}
+                                            checked={selectedUnpaid[rent.groupKey] || false}
+                                            onCheckedChange={(checked) => setSelectedUnpaid(prev => ({...prev, [rent.groupKey]: !!checked}))}
+                                        />
+                                        <label htmlFor={`rent-${rent.groupKey}`} className="text-sm">
+                                            <p className="font-medium">Loyer impayé - {rent.period}</p>
+                                        </label>
+                                    </div>
+                                    <span className="font-semibold text-sm text-destructive">{(rent.totalDue - rent.totalPaid).toFixed(2)} €</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">Aucun loyer impayé pour ce locataire.</p>
+                    )}
+                </div>
+
                 <div>
                     <h4 className="font-semibold mb-2 flex items-center gap-2">
                         <Wrench className="h-4 w-4"/> Déductions pour réparations
@@ -818,3 +989,4 @@ export default function TenantsPage() {
     </div>
   );
 }
+

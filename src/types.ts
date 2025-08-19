@@ -3,6 +3,7 @@
 
 
 
+
 export type OwnerInfo = {
   name: string;
   address: string;
@@ -25,7 +26,7 @@ export type Tenant = {
   propertyName: string;
   leaseStart: string;
   leaseDuration: number;
-  status: string;
+  status: 'Actif' | 'Inactif';
   idCardUrl: string;
   idCardPath: string;
   rent: number;
