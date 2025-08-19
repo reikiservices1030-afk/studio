@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -18,7 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
-  BarChart,
+  BarChart as RechartsBarChart,
   Bar,
   XAxis,
   YAxis,
@@ -40,47 +41,28 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 
-const monthlyRevenue = [
-  { month: 'Jan', revenue: 4000 },
-  { month: 'Fév', revenue: 3000 },
-  { month: 'Mar', revenue: 5000 },
-  { month: 'Avr', revenue: 4500 },
-  { month: 'Mai', revenue: 6000 },
-  { month: 'Juin', revenue: 5500 },
-];
 
-const recentActivity = [
-  {
-    id: 1,
-    tenant: 'Lucas Dubois',
-    activity: 'Loyer payé',
-    amount: 1200,
-    status: 'Terminé',
-  },
-  {
-    id: 2,
-    tenant: 'Chloé Lambert',
-    activity: 'Demande de maintenance',
-    amount: null,
-    status: 'En attente',
-  },
-  {
-    id: 3,
-    tenant: 'Thomas Martin',
-    activity: 'Bail signé',
-    amount: null,
-    status: 'Terminé',
-  },
-  {
-    id: 4,
-    tenant: 'Léa Bernard',
-    activity: 'Loyer en retard',
-    amount: 950,
-    status: 'En retard',
-  },
-];
+type DashboardClientProps = {
+  data: {
+    totalRevenue: number;
+    occupancyRate: number;
+    upcomingPaymentsCount: number;
+    openIssuesCount: number;
+    monthlyRevenue: { month: string; revenue: number }[];
+    recentActivity: { id: string; tenant: string; activity: string; status: string }[];
+  }
+}
 
-export function DashboardClient() {
+export function DashboardClient({ data }: DashboardClientProps) {
+  const { 
+    totalRevenue, 
+    occupancyRate, 
+    upcomingPaymentsCount, 
+    openIssuesCount, 
+    monthlyRevenue, 
+    recentActivity 
+  } = data;
+
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -92,10 +74,9 @@ export function DashboardClient() {
             <Euro className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">45,231.89 €</div>
+            <div className="text-2xl font-bold">{totalRevenue.toLocaleString('fr-BE', { style: 'currency', currency: 'EUR' })}</div>
             <p className="text-xs text-muted-foreground flex items-center">
-              <ArrowUp className="h-3 w-3 text-green-500 mr-1" />
-              +20.1% depuis le mois dernier
+              Total de tous les paiements enregistrés
             </p>
           </CardContent>
         </Card>
@@ -107,8 +88,8 @@ export function DashboardClient() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">92%</div>
-            <Progress value={92} className="mt-2 h-2" />
+            <div className="text-2xl font-bold">{occupancyRate.toFixed(0)}%</div>
+            <Progress value={occupancyRate} className="mt-2 h-2" />
           </CardContent>
         </Card>
         <Card>
@@ -119,7 +100,7 @@ export function DashboardClient() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">5</div>
+            <div className="text-2xl font-bold">{upcomingPaymentsCount}</div>
             <p className="text-xs text-muted-foreground">
               Attendus dans les 7 prochains jours
             </p>
@@ -131,9 +112,9 @@ export function DashboardClient() {
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">{openIssuesCount}</div>
             <p className="text-xs text-muted-foreground">
-              Demandes de maintenance en attente
+              Rappels de loyer en attente
             </p>
           </CardContent>
         </Card>
@@ -150,7 +131,7 @@ export function DashboardClient() {
           <CardContent>
             <ChartContainer config={{}} className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyRevenue}>
+                <RechartsBarChart data={monthlyRevenue}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis
                     dataKey="month"
@@ -172,7 +153,7 @@ export function DashboardClient() {
                     radius={[4, 4, 0, 0]}
                     name="Revenu"
                   />
-                </BarChart>
+                </RechartsBarChart>
               </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
@@ -181,7 +162,7 @@ export function DashboardClient() {
           <CardHeader>
             <CardTitle className="font-headline">Activité récente</CardTitle>
             <CardDescription>
-              Dernières activités des locataires et des propriétés.
+              Derniers paiements de loyer enregistrés.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -194,7 +175,7 @@ export function DashboardClient() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentActivity.map((activity) => (
+                {recentActivity.length > 0 ? recentActivity.map((activity) => (
                   <TableRow key={activity.id}>
                     <TableCell className="font-medium">
                       {activity.tenant}
@@ -203,10 +184,8 @@ export function DashboardClient() {
                     <TableCell>
                       <Badge
                         variant={
-                          activity.status === 'Terminé'
+                          activity.status === 'Payé'
                             ? 'default'
-                            : activity.status === 'En attente'
-                            ? 'secondary'
                             : 'destructive'
                         }
                         className="capitalize"
@@ -215,7 +194,11 @@ export function DashboardClient() {
                       </Badge>
                     </TableCell>
                   </TableRow>
-                ))}
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground">Aucune activité récente</TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>
