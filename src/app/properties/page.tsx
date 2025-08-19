@@ -86,11 +86,11 @@ export default function PropertiesPage() {
   };
 
   const handleSave = async () => {
-    if (!currentProperty.address || !currentProperty.rent) {
+    if (!currentProperty.address || !currentProperty.baseRent) {
       toast({
         variant: 'destructive',
         title: 'Erreur',
-        description: 'Veuillez remplir tous les champs.',
+        description: 'Veuillez remplir au moins l\'adresse et le loyer de base.',
       });
       return;
     }
@@ -115,7 +115,11 @@ export default function PropertiesPage() {
 
       const propertyData = {
         address: currentProperty.address,
-        rent: Number(currentProperty.rent),
+        baseRent: Number(currentProperty.baseRent),
+        chargesWater: Number(currentProperty.chargesWater || 0),
+        chargesElectricity: Number(currentProperty.chargesElectricity || 0),
+        chargesGas: Number(currentProperty.chargesGas || 0),
+        chargesCommon: Number(currentProperty.chargesCommon || 0),
         imageUrl,
         imagePath,
       };
@@ -167,6 +171,10 @@ export default function PropertiesPage() {
     setIsEditing(true);
     setIsDialogOpen(true);
   };
+  
+  const calculateTotalCharges = (prop: Property) => {
+    return (prop.chargesWater || 0) + (prop.chargesElectricity || 0) + (prop.chargesGas || 0) + (prop.chargesCommon || 0);
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -201,7 +209,10 @@ export default function PropertiesPage() {
               </div>
             ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {properties.map((prop) => (
+                {properties.map((prop) => {
+                  const totalCharges = calculateTotalCharges(prop);
+                  const totalRent = prop.baseRent + totalCharges;
+                  return (
                   <Card key={prop.id} className="overflow-hidden">
                     <div className="relative h-48 w-full">
                       <Image
@@ -216,7 +227,8 @@ export default function PropertiesPage() {
                       <div className="flex justify-between items-start">
                         <div>
                             <p className="font-semibold">{prop.address}</p>
-                            <p className="text-primary font-bold text-lg">{prop.rent} € / mois</p>
+                            <p className="text-primary font-bold text-lg">{totalRent.toFixed(2)} € / mois</p>
+                            <p className="text-xs text-muted-foreground">Loyer: {prop.baseRent.toFixed(2)}€ + Charges: {totalCharges.toFixed(2)}€</p>
                         </div>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -236,7 +248,7 @@ export default function PropertiesPage() {
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                )})}
               </div>
             )}
           </CardContent>
@@ -244,7 +256,7 @@ export default function PropertiesPage() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {isEditing ? 'Modifier la propriété' : 'Ajouter une propriété'}
@@ -265,15 +277,33 @@ export default function PropertiesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="rent">Loyer mensuel (€)</Label>
+              <Label htmlFor="baseRent">Loyer de base (€)</Label>
               <Input
-                id="rent"
+                id="baseRent"
                 type="number"
-                value={currentProperty.rent || ''}
+                value={currentProperty.baseRent || ''}
                 onChange={(e) =>
-                  setCurrentProperty({ ...currentProperty, rent: Number(e.target.value) })
+                  setCurrentProperty({ ...currentProperty, baseRent: Number(e.target.value) })
                 }
               />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                    <Label htmlFor="chargesWater">Charges eau (€)</Label>
+                    <Input id="chargesWater" type="number" value={currentProperty.chargesWater || ''} onChange={(e) => setCurrentProperty({ ...currentProperty, chargesWater: Number(e.target.value) })}/>
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="chargesElectricity">Charges élec. (€)</Label>
+                    <Input id="chargesElectricity" type="number" value={currentProperty.chargesElectricity || ''} onChange={(e) => setCurrentProperty({ ...currentProperty, chargesElectricity: Number(e.target.value) })}/>
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="chargesGas">Charges gaz (€)</Label>
+                    <Input id="chargesGas" type="number" value={currentProperty.chargesGas || ''} onChange={(e) => setCurrentProperty({ ...currentProperty, chargesGas: Number(e.target.value) })}/>
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="chargesCommon">Charges comm. (€)</Label>
+                    <Input id="chargesCommon" type="number" value={currentProperty.chargesCommon || ''} onChange={(e) => setCurrentProperty({ ...currentProperty, chargesCommon: Number(e.target.value) })}/>
+                </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="image">Image</Label>

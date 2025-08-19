@@ -24,7 +24,7 @@ export type Tenant = {
   status: 'Actif' | 'Inactif';
   idCardUrl: string;
   idCardPath: string;
-  rent: number;
+  rent: number; // This will now store the total rent (base + charges)
   paymentDueDay: number;
   depositAmount: number;
   depositStatus: 'Non payé' | 'Payé' | 'Remboursé' | 'Partiellement remboursé';
@@ -33,7 +33,11 @@ export type Tenant = {
 export type Property = {
   id: string;
   address: string;
-  rent: number;
+  baseRent: number;
+  chargesWater?: number;
+  chargesElectricity?: number;
+  chargesGas?: number;
+  chargesCommon?: number;
   imageUrl: string;
   imagePath: string;
 };

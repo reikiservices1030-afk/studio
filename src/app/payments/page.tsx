@@ -152,6 +152,16 @@ export default function PaymentsPage() {
         const groupKey = `${p.tenantId}-${p.type}-${p.period}`;
         
         if (!groups[groupKey]) {
+            const tenant = tenants.find(t => t.id === p.tenantId);
+            const property = tenant ? properties.find(prop => prop.id === tenant.propertyId) : undefined;
+            
+            let rentDue = 0;
+            if (p.type === 'Loyer' && tenant) {
+                rentDue = tenant.rent || 0;
+            } else if (p.type === 'Caution' && tenant) {
+                rentDue = tenant.depositAmount || 0;
+            }
+
             groups[groupKey] = {
                 groupKey,
                 tenantId: p.tenantId,
@@ -160,7 +170,7 @@ export default function PaymentsPage() {
                 property: p.property,
                 type: p.type,
                 period: p.period,
-                totalDue: p.rentDue || 0,
+                totalDue: p.rentDue || rentDue, // Use stored rentDue, fallback to calculated
                 totalPaid: 0,
                 status: '',
                 payments: [],
@@ -170,7 +180,7 @@ export default function PaymentsPage() {
         if(p.status === 'Payé') {
           groups[groupKey].totalPaid += p.amount;
         }
-        // Ensure totalDue is set from the first payment of the group
+        // Ensure totalDue is set from the first payment of the group, if not already set
         if (!groups[groupKey].totalDue && p.rentDue) {
           groups[groupKey].totalDue = p.rentDue;
         }
@@ -193,18 +203,21 @@ export default function PaymentsPage() {
       if (a.period < b.period) return 1;
       return 0;
     });
-  }, [payments]);
+  }, [payments, tenants, properties]);
   
   const resetDialog = () => {
     setIsDialogOpen(false);
     setIsEditing(false);
+    const firstPeriod = recentPeriods[0] || '';
+    const capitalizedPeriod = firstPeriod ? firstPeriod.charAt(0).toUpperCase() + firstPeriod.slice(1) : '';
+
     setCurrentPayment({
         tenantId: "",
         date: new Date().toISOString().split('T')[0],
         amount: 0,
         status: "Payé",
         type: "Loyer",
-        period: recentPeriods[0] || `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
+        period: capitalizedPeriod || `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
     });
   };
 
@@ -214,11 +227,10 @@ export default function PaymentsPage() {
       toast({ variant: "destructive", title: "Erreur", description: "Veuillez remplir tous les champs."});
       return;
     }
-    const property = properties.find(p => p.id === tenant.propertyId);
     
     let rentDue = 0;
-    if (currentPayment.type === 'Loyer' && property) {
-        rentDue = property.rent;
+    if (currentPayment.type === 'Loyer') {
+        rentDue = tenant.rent || 0;
     } else if (currentPayment.type === 'Caution') {
         rentDue = tenant.depositAmount || 0;
     }
@@ -265,13 +277,16 @@ export default function PaymentsPage() {
   
   const openAddDialog = () => {
     setIsEditing(false);
+     const firstPeriod = recentPeriods[0] || '';
+    const capitalizedPeriod = firstPeriod ? firstPeriod.charAt(0).toUpperCase() + firstPeriod.slice(1) : '';
+
     setCurrentPayment({
         tenantId: "",
         date: new Date().toISOString().split('T')[0],
         amount: 0,
         status: "Payé",
         type: 'Loyer',
-        period: recentPeriods[0] || `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
+        period: capitalizedPeriod || `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
     });
     setIsDialogOpen(true);
   }
@@ -378,28 +393,13 @@ export default function PaymentsPage() {
   const handlePrintReceipt = async (group: GroupedPayment) => {
     const receiptHtml = getReceiptHTML(group);
 
-    const printContainer = document.createElement('div');
-    printContainer.style.position = 'absolute';
-    printContainer.style.left = '-9999px';
-    printContainer.innerHTML = receiptHtml;
-    document.body.appendChild(printContainer);
-    
-    try {
-      toast({ title: "Génération du PDF...", description: "Veuillez patienter." });
-      const canvas = await html2canvas(printContainer.querySelector('.container') as HTMLElement);
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      
-      pdf.output('dataurlnewwindow');
-      
-    } catch (error) {
-      console.error("Error generating receipt:", error);
-      toast({ variant: "destructive", title: "Erreur", description: "Impossible de générer le reçu." });
-    } finally {
-        document.body.removeChild(printContainer);
+    const printWindow = window.open('', '_blank');
+    if(printWindow) {
+      printWindow.document.write(receiptHtml);
+      printWindow.document.close();
+      printWindow.focus();
+    } else {
+        toast({ variant: "destructive", title: "Erreur", description: "Impossible d'ouvrir la fenêtre d'impression. Veuillez désactiver votre bloqueur de pop-ups." });
     }
   };
 
@@ -408,6 +408,9 @@ export default function PaymentsPage() {
         setCurrentPayment({ ...currentPayment, period: period });
         return;
     }
+    const tenant = tenants.find(t => t.id === currentPayment.tenantId);
+    if (!tenant) return;
+
     const groupKey = `${currentPayment.tenantId}-Loyer-${period}`;
     const existingGroup = groupedPayments.find(g => g.groupKey === groupKey);
 
@@ -415,9 +418,7 @@ export default function PaymentsPage() {
       const remainingAmount = (existingGroup.totalDue || 0) - (existingGroup.totalPaid || 0);
       setCurrentPayment({ ...currentPayment, period: period, amount: remainingAmount > 0 ? remainingAmount : 0 });
     } else {
-      const tenant = tenants.find(t => t.id === currentPayment.tenantId);
-      const property = tenant ? properties.find(p => p.id === tenant.propertyId) : undefined;
-      setCurrentPayment({ ...currentPayment, period: period, amount: property?.rent || 0 });
+      setCurrentPayment({ ...currentPayment, period: period, amount: tenant.rent || 0 });
     }
   };
   
@@ -425,24 +426,32 @@ export default function PaymentsPage() {
     const tenant = tenants.find(t => t.id === tenantId);
     if (!tenant) return;
     
-    const property = properties.find(p => p.id === tenant.propertyId);
     let amount = 0;
-    if(property){
+    if(tenant){
         if (currentPayment.type === 'Loyer') {
-            amount = property.rent;
+            amount = tenant.rent;
         } else if (currentPayment.type === 'Caution') {
             amount = tenant.depositAmount || 0;
         }
     }
     
-    setCurrentPayment({
+    const updatedPayment = {
         ...currentPayment,
         tenantId: tenantId,
         amount: amount,
-    });
+    };
+    setCurrentPayment(updatedPayment);
 
-    if (currentPayment.type === 'Loyer' && currentPayment.period) {
-        handlePeriodChange(currentPayment.period);
+    if (updatedPayment.type === 'Loyer' && updatedPayment.period) {
+        // Re-evaluate amount based on the selected period for the new tenant
+        const groupKey = `${tenantId}-Loyer-${updatedPayment.period}`;
+        const existingGroup = groupedPayments.find(g => g.groupKey === groupKey);
+        if (existingGroup && existingGroup.status !== 'Payé') {
+            const remainingAmount = (existingGroup.totalDue || 0) - (existingGroup.totalPaid || 0);
+            setCurrentPayment({ ...updatedPayment, amount: remainingAmount > 0 ? remainingAmount : 0 });
+        } else {
+            setCurrentPayment({ ...updatedPayment, amount: tenant.rent || 0 });
+        }
     }
   };
 
@@ -514,7 +523,7 @@ export default function PaymentsPage() {
                           <DropdownMenuLabel>Actions sur le groupe</DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => handlePrintReceipt(group)}>
                             <Printer className="mr-2 h-4 w-4" />
-                            Voir le reçu global
+                            Imprimer le reçu
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleSendReceipt(group)}>
                             <WhatsappIcon />
@@ -557,12 +566,15 @@ export default function PaymentsPage() {
                 <Select
                     onValueChange={(value: 'Loyer' | 'Caution') => {
                         const tenant = tenants.find(t => t.id === currentPayment.tenantId);
-                        const property = tenant ? properties.find(p => p.id === tenant.propertyId) : undefined;
-                        const amount = property ? (value === 'Loyer' ? property.rent : tenant?.depositAmount) : 0;
+                        let amount = 0;
+                        if(tenant) {
+                           amount = value === 'Loyer' ? tenant.rent : (tenant.depositAmount || 0);
+                        }
                         const period = value === 'Loyer' ? (recentPeriods[0] || '') : 'Caution';
                         setCurrentPayment({ ...currentPayment, type: value, amount: amount || 0, period });
                     }}
                     value={currentPayment.type}
+                    disabled={!isEditing && false}
                 >
                     <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -576,6 +588,7 @@ export default function PaymentsPage() {
                 <Select 
                     onValueChange={handleTenantChange}
                     value={currentPayment.tenantId}
+                    disabled={!isEditing && false}
                 >
                     <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Sélectionnez un locataire" />
@@ -592,6 +605,7 @@ export default function PaymentsPage() {
                <Select
                   onValueChange={handlePeriodChange}
                   value={currentPayment.period}
+                   disabled={!isEditing && false}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Sélectionnez une période" />
@@ -619,4 +633,3 @@ export default function PaymentsPage() {
     </div>
   );
 }
-

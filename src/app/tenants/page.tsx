@@ -320,6 +320,8 @@ export default function TenantsPage() {
             return;
         }
 
+        const totalRent = selectedProperty.baseRent + (selectedProperty.chargesWater || 0) + (selectedProperty.chargesElectricity || 0) + (selectedProperty.chargesGas || 0) + (selectedProperty.chargesCommon || 0);
+
         const tenantData: Omit<Tenant, 'id'> = {
             firstName: currentTenant.firstName || '',
             lastName: currentTenant.lastName || '',
@@ -335,7 +337,7 @@ export default function TenantsPage() {
             idCardPath,
             status: currentTenant.status || 'Actif',
             propertyName: selectedProperty?.address || 'N/A',
-            rent: selectedProperty.rent,
+            rent: totalRent,
             paymentDueDay: currentTenant.paymentDueDay || 1,
             depositAmount: currentTenant.depositAmount || 0,
             depositStatus: currentTenant.depositStatus || 'Non payé',
@@ -469,6 +471,17 @@ export default function TenantsPage() {
     leaseEndDate.setFullYear(leaseEndDate.getFullYear() + Math.floor((tenant.leaseDuration || 0) / 12));
     leaseEndDate.setMonth(leaseEndDate.getMonth() + ((tenant.leaseDuration || 0) % 12));
 
+    const totalRent = property.baseRent + (property.chargesWater || 0) + (property.chargesElectricity || 0) + (property.chargesGas || 0) + (property.chargesCommon || 0);
+    const chargesBreakdown = `
+        <ul>
+            <li>Loyer de base: ${property.baseRent.toFixed(2)} €</li>
+            ${property.chargesWater ? `<li>Provision eau: ${property.chargesWater.toFixed(2)} €</li>` : ''}
+            ${property.chargesElectricity ? `<li>Provision électricité: ${property.chargesElectricity.toFixed(2)} €</li>` : ''}
+            ${property.chargesGas ? `<li>Provision gaz: ${property.chargesGas.toFixed(2)} €</li>` : ''}
+            ${property.chargesCommon ? `<li>Provision charges communes: ${property.chargesCommon.toFixed(2)} €</li>` : ''}
+        </ul>
+    `;
+
     const leaseContent = `
       <html>
         <head>
@@ -525,14 +538,16 @@ export default function TenantsPage() {
             </div>
 
             <div class="section">
-              <h2>Article 2 : Loyer</h2>
-              <p>Le loyer mensuel est fixé à <strong>${property.rent.toFixed(2)} €</strong> (euros), payable par virement anticipativement pour le ${tenant.paymentDueDay} de chaque mois sur le compte bancaire du bailleur : ${ownerInfo.bankAccount || '[IBAN du bailleur]'}.</p>
-              <p>Le loyer sera indexé annuellement à la date anniversaire du bail, sur base de l'indice santé, conformément à la législation en vigueur.</p>
+              <h2>Article 2 : Loyer et charges</h2>
+              <p>Le loyer mensuel total est fixé à <strong>${totalRent.toFixed(2)} €</strong> (euros), décomposé comme suit :</p>
+              ${chargesBreakdown}
+              <p>Le loyer est payable par virement anticipativement pour le ${tenant.paymentDueDay} de chaque mois sur le compte bancaire du bailleur : ${ownerInfo.bankAccount || '[IBAN du bailleur]'}.</p>
+              <p>Le loyer de base sera indexé annuellement à la date anniversaire du bail, sur base de l'indice santé, conformément à la législation en vigueur.</p>
             </div>
 
             <div class="section">
               <h2>Article 3 : Garantie locative</h2>
-              <p>Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer, soit <strong>${(tenant.depositAmount || 0).toFixed(2)} €</strong>. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.</p>
+              <p>Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer de base, soit <strong>${(tenant.depositAmount || 0).toFixed(2)} €</strong>. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.</p>
             </div>
 
             <div class="section signatures">
@@ -662,6 +677,19 @@ export default function TenantsPage() {
       document.body.removeChild(printContainer);
     }
   };
+  
+  const handlePropertyChange = (propertyId: string) => {
+    const selectedProperty = properties.find((p) => p.id === propertyId);
+    if(selectedProperty) {
+      const totalRent = selectedProperty.baseRent + (selectedProperty.chargesWater || 0) + (selectedProperty.chargesElectricity || 0) + (selectedProperty.chargesGas || 0) + (selectedProperty.chargesCommon || 0);
+      setCurrentTenant({
+        ...currentTenant,
+        propertyId: propertyId,
+        rent: totalRent,
+        depositAmount: selectedProperty ? selectedProperty.baseRent * 2 : 0,
+      });
+    }
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -757,24 +785,17 @@ export default function TenantsPage() {
                 <Label>Propriété à louer</Label>
                 <Select
                   value={currentTenant.propertyId}
-                  onValueChange={(value) => {
-                    const selectedProperty = properties.find((p) => p.id === value);
-                    setCurrentTenant({
-                      ...currentTenant,
-                      propertyId: value,
-                      depositAmount: selectedProperty ? selectedProperty.rent * 2 : 0,
-                    });
-                  }}
+                  onValueChange={handlePropertyChange}
                 >
                     <SelectTrigger><SelectValue placeholder="Sélectionnez une propriété" /></SelectTrigger>
                     <SelectContent>
-                        {properties.filter(p => !tenants.some(t => t.propertyId === p.id && t.status === 'Actif' && t.id !== currentTenant.id)).map(p => (<SelectItem key={p.id} value={p.id}>{p.address} - {p.rent}€</SelectItem>))}
+                        {properties.filter(p => !tenants.some(t => t.propertyId === p.id && t.status === 'Actif' && t.id !== currentTenant.id)).map(p => (<SelectItem key={p.id} value={p.id}>{p.address} - {(p.baseRent + (p.chargesWater || 0) + (p.chargesElectricity || 0) + (p.chargesGas || 0) + (p.chargesCommon || 0)).toFixed(2)}€</SelectItem>))}
                     </SelectContent>
                 </Select>
             </div>
             {currentTenant.propertyId && (
                 <div className="space-y-2">
-                    <Label>Caution (2 mois de loyer)</Label>
+                    <Label>Caution (2 mois de loyer de base)</Label>
                     <Input value={currentTenant.depositAmount ? `${currentTenant.depositAmount.toFixed(2)} €` : '0.00 €'} disabled />
                 </div>
             )}
