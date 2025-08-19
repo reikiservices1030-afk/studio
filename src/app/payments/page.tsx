@@ -269,7 +269,7 @@ export default function PaymentsPage() {
 
     let paymentsDetails = group.payments.map(p => `- ${new Date(p.date).toLocaleDateString('fr-BE')}: ${(p.amount || 0).toFixed(2)} €`).join('\n');
 
-    return `Bonjour ${group.tenantFirstName} ${group.tenantLastName},\n\nVoici votre reçu pour le paiement de ${group.type.toLowerCase()} pour ${group.period}.\n\n- Montant total dû : ${(group.totalDue || 0).toFixed(2)} €\n- Montant total payé : ${(group.totalPaid || 0).toFixed(2)} €\n- Propriété : ${group.property}\n\nDétails des paiements:\n${paymentsDetails}\n\n${balanceText}\n\nCordialement,\n${ownerInfo?.name || ''}`;
+    return `Bonjour ${group.tenantFirstName} ${group.tenantLastName},\n\nVoici votre reçu pour le paiement de ${(group.type || '').toLowerCase()} pour ${group.period}.\n\n- Montant total dû : ${(group.totalDue || 0).toFixed(2)} €\n- Montant total payé : ${(group.totalPaid || 0).toFixed(2)} €\n- Propriété : ${group.property}\n\nDétails des paiements:\n${paymentsDetails}\n\n${balanceText}\n\nCordialement,\n${ownerInfo?.name || ''}`;
   }
 
   const handleSendReceipt = (group: GroupedPayment) => {
@@ -299,11 +299,12 @@ export default function PaymentsPage() {
     const balance = (group.totalDue || 0) - (group.totalPaid || 0);
     const balanceText = balance > 0 ? `<tr><th style="color: #e53e3e;">Solde restant:</th><td style="color: #e53e3e; font-weight: bold;">${balance.toFixed(2)} €</td></tr>` : '<tr><td colspan="2" style="text-align:center; font-weight:bold; color: #38a169;">Paiement complet</td></tr>';
     const paymentsHtml = group.payments.map(p => `<tr><td>Paiement du ${new Date(p.date).toLocaleDateString('fr-BE')}</td><td>${(p.amount || 0).toFixed(2)} €</td></tr>`).join('');
+    const type = group.type || '';
 
     return `
       <html>
         <head>
-          <title>Quittance de ${group.type} - ${group.period}</title>
+          <title>Quittance de ${type} - ${group.period}</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 0; padding: 2rem; color: #333; }
             .container { border: 1px solid #eee; padding: 2rem; border-radius: 10px; max-width: 800px; margin: auto; background: white; }
@@ -325,7 +326,7 @@ export default function PaymentsPage() {
         <body>
           <div class="container">
             <div class="header">
-              <h1>QUITTANCE DE ${group.type.toUpperCase()}</h1>
+              <h1>QUITTANCE DE ${type.toUpperCase()}</h1>
               <p>Période: ${group.period}</p>
             </div>
              <div class="parties">
