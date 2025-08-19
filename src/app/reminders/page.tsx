@@ -1,3 +1,7 @@
+
+'use client';
+
+import { useState } from 'react';
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,50 +28,112 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const reminders = [
+
+const initialReminders = [
   {
-    tenant: "John Doe",
-    property: "Appt 101, 123 Rue Principale",
+    id: "R001",
+    tenant: "Jean Dupont",
+    tenantId: "T001",
+    property: "Appt 101, Rue de la Loi 1, 1000 Bruxelles",
     dueDate: "2024-08-01",
     amount: 1200,
     status: "Envoyé",
   },
   {
-    tenant: "Jane Smith",
-    property: "Unité 5, 456 Avenue du Chêne",
+    id: "R002",
+    tenant: "Marie Dubois",
+    tenantId: "T002",
+    property: "Unité 5, Grote Markt 1, 2000 Antwerpen",
     dueDate: "2024-08-01",
     amount: 1500,
     status: "Envoyé",
   },
   {
-    tenant: "Mike Johnson",
-    property: "Appt 202, 123 Rue Principale",
+    id: "R003",
+    tenant: "Luc Martin",
+    tenantId: "T003",
+    property: "Appt 202, Rue de la Loi 1, 1000 Bruxelles",
     dueDate: "2024-08-01",
     amount: 1250,
     status: "En attente",
   },
   {
-    tenant: "Sarah Williams",
-    property: "Maison, 789 Allée des Pins",
+    id: "R004",
+    tenant: "Sophie Bernard",
+    tenantId: "T004",
+    property: "Maison, Rue Neuve 25, 1000 Bruxelles",
     dueDate: "2024-08-01",
     amount: 2500,
     status: "Programmé",
   },
   {
-    tenant: "David Brown",
-    property: "Condo 3, 321 Cour des Ormes",
+    id: "R005",
+    tenant: "David Leroy",
+    tenantId: "T005",
+    property: "Condo 3, Place Saint-Lambert 1, 4000 Liège",
     dueDate: "2024-09-01",
     amount: 1800,
     status: "Programmé",
   },
 ];
 
+// Mock tenants for the select dropdown
+const tenants = [
+   { id: "T001", name: "Jean Dupont", amount: 1200 },
+   { id: "T002", name: "Marie Dubois", amount: 1500 },
+   { id: "T003", name: "Luc Martin", amount: 1250 },
+   { id: "T004", name: "Sophie Bernard", amount: 2500 },
+   { id: "T005", name: "David Leroy", amount: 1800 },
+];
+
+
 export default function RemindersPage() {
+    const [reminders, setReminders] = useState(initialReminders);
+    const [isAddReminderOpen, setIsAddReminderOpen] = useState(false);
+    const [newReminder, setNewReminder] = useState({
+        tenantId: "",
+        dueDate: "",
+        amount: ""
+    });
+
+    const handleAddReminder = () => {
+        const tenant = tenants.find(t => t.id === newReminder.tenantId);
+        if (!tenant) return;
+
+        setReminders(prev => [...prev, {
+            id: `R${String(prev.length + 1).padStart(3, '0')}`,
+            tenant: tenant.name,
+            tenantId: tenant.id,
+            property: "Propriété à récupérer",
+            dueDate: newReminder.dueDate,
+            amount: parseFloat(newReminder.amount) || tenant.amount,
+            status: "Programmé"
+        }]);
+        setNewReminder({ tenantId: "", dueDate: "", amount: "" });
+        setIsAddReminderOpen(false);
+    }
+    
+    const sendReminder = (id: string) => {
+        setReminders(reminders.map(r => r.id === id ? { ...r, status: "Envoyé" } : r));
+    }
+
   return (
     <div className="flex flex-col h-full">
       <Header title="Rappels de loyer">
-        <Button size="sm" className="gap-1">
+        <Button size="sm" className="gap-1" onClick={() => setIsAddReminderOpen(true)}>
           <PlusCircle className="h-3.5 w-3.5" />
           Nouveau rappel
         </Button>
@@ -96,11 +162,11 @@ export default function RemindersPage() {
               </TableHeader>
               <TableBody>
                 {reminders.map((reminder) => (
-                  <TableRow key={reminder.tenant}>
+                  <TableRow key={reminder.id}>
                     <TableCell className="font-medium">{reminder.tenant}</TableCell>
                     <TableCell className="hidden md:table-cell">{reminder.property}</TableCell>
                     <TableCell>{reminder.dueDate}</TableCell>
-                    <TableCell className="hidden sm:table-cell">${reminder.amount.toFixed(2)}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{reminder.amount.toFixed(2)} €</TableCell>
                     <TableCell>
                       <Badge variant={reminder.status === 'Envoyé' ? 'default' : reminder.status === 'En attente' ? 'destructive' : 'secondary'}>{reminder.status}</Badge>
                     </TableCell>
@@ -114,7 +180,7 @@ export default function RemindersPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem disabled={reminder.status !== 'En attente'}>
+                          <DropdownMenuItem disabled={reminder.status === 'Envoyé'} onClick={() => sendReminder(reminder.id)}>
                             <Send className="mr-2 h-4 w-4" />
                             Envoyer maintenant
                           </DropdownMenuItem>
@@ -132,6 +198,43 @@ export default function RemindersPage() {
           </CardContent>
         </Card>
       </div>
+      <Dialog open={isAddReminderOpen} onOpenChange={setIsAddReminderOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Créer un nouveau rappel</DialogTitle>
+            <DialogDescription>
+              Sélectionnez un locataire et définissez les détails du rappel.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="tenant" className="text-right">Locataire</Label>
+                <Select onValueChange={(value) => setNewReminder({...newReminder, tenantId: value})}>
+                    <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Sélectionnez un locataire" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {tenants.map(t => (
+                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="amount" className="text-right">Montant (€)</Label>
+              <Input id="amount" type="number" value={newReminder.amount} placeholder={`par défaut: ${tenants.find(t => t.id === newReminder.tenantId)?.amount || '0.00'}`} onChange={(e) => setNewReminder({...newReminder, amount: e.target.value})} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="dueDate" className="text-right">Date d'échéance</Label>
+              <Input id="dueDate" type="date" value={newReminder.dueDate} onChange={(e) => setNewReminder({...newReminder, dueDate: e.target.value})} className="col-span-3" />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
+            <Button onClick={handleAddReminder}>Programmer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

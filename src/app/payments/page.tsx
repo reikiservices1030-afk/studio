@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useState } from 'react';
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,12 +29,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const payments = [
+const initialPayments = [
   {
     id: "PAY-2024-001",
-    tenant: "John Doe",
-    phone: "+33612345678",
-    property: "Appt 101",
+    tenant: "Jean Dupont",
+    phone: "+32470123456",
+    property: "Appt 101, Rue de la Loi 1",
     date: "2024-07-01",
     amount: 1200,
     status: "Payé",
@@ -41,9 +42,9 @@ const payments = [
   },
   {
     id: "PAY-2024-002",
-    tenant: "Jane Smith",
-    phone: "+33687654321",
-    property: "Unité 5",
+    tenant: "Marie Dubois",
+    phone: "+32486123456",
+    property: "Unité 5, Grote Markt 1",
     date: "2024-07-03",
     amount: 1500,
     status: "Payé",
@@ -51,9 +52,9 @@ const payments = [
   },
   {
     id: "PAY-2024-003",
-    tenant: "Sarah Williams",
-    phone: "+33611223344",
-    property: "Maison",
+    tenant: "Sophie Bernard",
+    phone: "+32475123456",
+    property: "Maison, Rue Neuve 25",
     date: "2024-07-05",
     amount: 2500,
     status: "En retard",
@@ -61,9 +62,9 @@ const payments = [
   },
   {
     id: "PAY-2024-004",
-    tenant: "Mike Johnson",
-    phone: "+33655667788",
-    property: "Appt 202",
+    tenant: "Luc Martin",
+    phone: "+32495123456",
+    property: "Appt 202, Rue de la Loi 1",
     date: "2024-06-01",
     amount: 1250,
     status: "Payé",
@@ -90,6 +91,7 @@ const WhatsappIcon = () => (
 
 
 export default function PaymentsPage() {
+  const [payments, setPayments] = useState(initialPayments);
 
   const handleSendReceipt = (payment: typeof payments[0]) => {
     const receiptText = `Bonjour ${payment.tenant},\n\nVoici votre reçu pour le loyer de ${payment.period}.\n\nMontant : ${payment.amount.toFixed(2)} €\nDate de paiement : ${payment.date}\nPropriété : ${payment.property}\n\nMerci.`;
@@ -131,7 +133,7 @@ export default function PaymentsPage() {
   return (
     <div className="flex flex-col h-full">
       <Header title="Paiements">
-        <Button size="sm" className="gap-1">
+        <Button size="sm" className="gap-1" onClick={() => alert('Fonctionnalité à implémenter')}>
           <PlusCircle className="h-3.5 w-3.5" />
           Ajouter un paiement
         </Button>
@@ -165,7 +167,7 @@ export default function PaymentsPage() {
                       <div className="text-sm text-muted-foreground">{payment.property}</div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{payment.date}</TableCell>
-                    <TableCell className="hidden sm:table-cell">${payment.amount.toFixed(2)}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{payment.amount.toFixed(2)} €</TableCell>
                     <TableCell>
                       <Badge variant={payment.status === 'Payé' ? 'default' : 'destructive'}>{payment.status}</Badge>
                     </TableCell>
