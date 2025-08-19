@@ -53,7 +53,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { db, storage } from '@/lib/firebase';
-import { ref as dbRef, onValue, push, remove, update, get } from "firebase/database";
+import { ref as dbRef, onValue, push, remove, update } from "firebase/database";
 import {
   ref as storageRef,
   uploadBytes,
@@ -63,6 +63,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import type { Tenant, Property, OwnerInfo } from '@/types';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 
 const WhatsappIcon = () => (
@@ -342,7 +344,7 @@ export default function TenantsPage() {
     window.open(whatsappUrl, '_blank');
   };
 
-  const generateLease = (tenant: Tenant) => {
+  const generateLease = async (tenant: Tenant) => {
     const property = properties.find(p => p.id === tenant.propertyId);
     if (!property || !ownerInfo) {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Informations sur la propriété ou le propriétaire manquantes.' });
@@ -358,7 +360,8 @@ export default function TenantsPage() {
         <head>
           <title>Contrat de Bail - ${tenant.lastName}</title>
           <style>
-            body { font-family: 'Times New Roman', serif; margin: 2rem; line-height: 1.6; font-size: 12pt; }
+            body { font-family: 'Times New Roman', serif; margin: 0; padding: 2rem; line-height: 1.6; font-size: 12pt; }
+            .container { max-width: 800px; margin: auto; background: white; padding: 2rem;}
             h1, h2, h3 { text-align: center; }
             .section { margin-top: 2rem; text-align: justify; }
             .parties, .signatures { display: flex; justify-content: space-between; margin-top: 2rem; }
@@ -369,76 +372,119 @@ export default function TenantsPage() {
           </style>
         </head>
         <body>
-          <h1>CONTRAT DE BAIL DE RÉSIDENCE PRINCIPALE</h1>
-          <h3>(Loi du 20 février 1991 - Code du Logement)</h3>
+          <div class="container">
+            <h1>CONTRAT DE BAIL DE RÉSIDENCE PRINCIPALE</h1>
+            <h3>(Loi du 20 février 1991 - Code du Logement)</h3>
 
-          <div class="section parties">
-            <div class="party">
-              <h2>ENTRE :</h2>
-              <ul>
-                <li><strong>LE BAILLEUR :</strong></li>
-                <li>${ownerInfo.name}</li>
-                <li>${ownerInfo.address}</li>
-                ${ownerInfo.companyNumber ? `<li>BCE : ${ownerInfo.companyNumber}</li>` : ''}
-              </ul>
+            <div class="section parties">
+              <div class="party">
+                <h2>ENTRE :</h2>
+                <ul>
+                  <li><strong>LE BAILLEUR :</strong></li>
+                  <li>${ownerInfo.name}</li>
+                  <li>${ownerInfo.address}</li>
+                  ${ownerInfo.companyNumber ? `<li>BCE : ${ownerInfo.companyNumber}</li>` : ''}
+                </ul>
+              </div>
+              <div class="party">
+                <h2>ET :</h2>
+                <ul>
+                  <li><strong>LE PRENEUR :</strong></li>
+                  <li>${tenant.firstName} ${tenant.lastName}</li>
+                  <li>Né(e) le: [Date de naissance]</li>
+                  <li>Nationalité : ${tenant.nationality}</li>
+                  <li>N° National : ${tenant.nationalId}</li>
+                </ul>
+              </div>
             </div>
-            <div class="party">
-              <h2>ET :</h2>
-              <ul>
-                <li><strong>LE PRENEUR :</strong></li>
-                <li>${tenant.firstName} ${tenant.lastName}</li>
-                <li>Né(e) le: [Date de naissance]</li>
-                <li>Nationalité : ${tenant.nationality}</li>
-                <li>N° National : ${tenant.nationalId}</li>
-              </ul>
+            
+            <div class="section">
+              <h2>IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :</h2>
+              <p>Le Bailleur loue au Preneur, qui accepte, le bien immobilier suivant :</p>
+              <p><strong>Désignation du bien :</strong> ${property.address}</p>
+              <p>Le bien est loué à usage exclusif d'habitation principale, le Preneur déclare bien connaître les lieux pour les avoir vus et visités.</p>
             </div>
-          </div>
-          
-          <div class="section">
-            <h2>IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :</h2>
-            <p>Le Bailleur loue au Preneur, qui accepte, le bien immobilier suivant :</p>
-            <p><strong>Désignation du bien :</strong> ${property.address}</p>
-            <p>Le bien est loué à usage exclusif d'habitation principale, le Preneur déclare bien connaître les lieux pour les avoir vus et visités.</p>
-          </div>
 
-          <div class="section">
-            <h2>Article 1 : Durée</h2>
-            <p>Le présent bail est consenti pour une durée de ${tenant.leaseDuration} mois, prenant cours le ${new Date(tenant.leaseStart).toLocaleDateString('fr-BE')} pour se terminer le ${leaseEndDate.toLocaleDateString('fr-BE')}.</p>
-          </div>
-
-          <div class="section">
-            <h2>Article 2 : Loyer</h2>
-            <p>Le loyer mensuel est fixé à <strong>${property.rent.toFixed(2)} €</strong> (euros), payable par virement anticipativement pour le ${tenant.paymentDueDay} de chaque mois sur le compte bancaire du bailleur : ${ownerInfo.bankAccount || '[IBAN du bailleur]'}.</p>
-            <p>Le loyer sera indexé annuellement à la date anniversaire du bail, sur base de l'indice santé, conformément à la législation en vigueur.</p>
-          </div>
-
-           <div class="section">
-            <h2>Article 3 : Garantie locative</h2>
-            <p>Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer, soit <strong>${tenant.depositAmount.toFixed(2)} €</strong>. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.</p>
-          </div>
-
-          <div class="section signatures">
-            <div class="signature">
-                <p>Fait à Bruxelles, le ${new Date().toLocaleDateString('fr-BE')}, en deux exemplaires, chaque partie reconnaissant avoir reçu le sien.</p>
-                <br/><br/>
-                <strong>LE BAILLEUR</strong>
-                <br/><br/>
-                (Signature)
+            <div class="section">
+              <h2>Article 1 : Durée</h2>
+              <p>Le présent bail est consenti pour une durée de ${tenant.leaseDuration} mois, prenant cours le ${new Date(tenant.leaseStart).toLocaleDateString('fr-BE')} pour se terminer le ${leaseEndDate.toLocaleDateString('fr-BE')}.</p>
             </div>
-            <div class="signature">
-                <br/><br/><br/><br/><br/><br/>
-                <strong>LE PRENEUR</strong>
-                <br/><br/>
-                (Signature)
+
+            <div class="section">
+              <h2>Article 2 : Loyer</h2>
+              <p>Le loyer mensuel est fixé à <strong>${property.rent.toFixed(2)} €</strong> (euros), payable par virement anticipativement pour le ${tenant.paymentDueDay} de chaque mois sur le compte bancaire du bailleur : ${ownerInfo.bankAccount || '[IBAN du bailleur]'}.</p>
+              <p>Le loyer sera indexé annuellement à la date anniversaire du bail, sur base de l'indice santé, conformément à la législation en vigueur.</p>
+            </div>
+
+            <div class="section">
+              <h2>Article 3 : Garantie locative</h2>
+              <p>Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer, soit <strong>${tenant.depositAmount.toFixed(2)} €</strong>. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.</p>
+            </div>
+
+            <div class="section signatures">
+              <div class="signature">
+                  <p>Fait à Bruxelles, le ${new Date().toLocaleDateString('fr-BE')}, en deux exemplaires, chaque partie reconnaissant avoir reçu le sien.</p>
+                  <br/><br/>
+                  <strong>LE BAILLEUR</strong>
+                  <br/><br/>
+                  (Signature)
+              </div>
+              <div class="signature">
+                  <br/><br/><br/><br/><br/><br/>
+                  <strong>LE PRENEUR</strong>
+                  <br/><br/>
+                  (Signature)
+              </div>
             </div>
           </div>
         </body>
       </html>
     `;
-    const printWindow = window.open('', '_blank');
-    printWindow?.document.write(leaseContent);
-    printWindow?.document.close();
-    printWindow?.print();
+    
+    // Create a temporary element to render the HTML for PDF conversion
+    const printContainer = document.createElement('div');
+    printContainer.innerHTML = leaseContent;
+    document.body.appendChild(printContainer);
+    
+    const canvas = await html2canvas(printContainer.querySelector('.container') as HTMLElement);
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    
+    document.body.removeChild(printContainer);
+
+    // Save PDF to Firebase and Database
+    try {
+      toast({ title: "Génération du PDF...", description: "Veuillez patienter." });
+      const pdfBlob = pdf.output('blob');
+      const fileName = `Bail-${tenant.lastName}-${tenant.leaseStart}.pdf`;
+      const storagePath = `documents/${fileName}`;
+      const fileStorageRef = storageRef(storage, storagePath);
+
+      await uploadBytes(fileStorageRef, pdfBlob);
+      const downloadURL = await getDownloadURL(fileStorageRef);
+
+      await push(dbRef(db, "documents"), {
+        name: fileName,
+        type: "application/pdf",
+        size: `${(pdfBlob.size / 1024).toFixed(2)} KB`,
+        uploaded: new Date().toISOString().split('T')[0],
+        url: downloadURL,
+        path: storagePath,
+      });
+
+      toast({ title: "Succès", description: "Bail sauvegardé dans les documents." });
+      
+      // Open print dialog
+      pdf.autoPrint();
+      window.open(pdf.output('bloburl'), '_blank');
+
+    } catch (error) {
+      console.error("Error saving or printing lease:", error);
+      toast({ variant: "destructive", title: "Erreur", description: "Impossible de sauvegarder ou d'imprimer le bail." });
+    }
   };
 
   return (
@@ -486,7 +532,7 @@ export default function TenantsPage() {
                             <DropdownMenuItem onClick={() => sendMessage(tenant)}><WhatsappIcon /><span className="ml-2">Envoyer un message</span></DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openDepositDialog(tenant)}><ShieldCheck className="mr-2 h-4 w-4" />Gérer la caution</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openEditDialog(tenant)}><Edit className="mr-2 h-4 w-4" />Modifier</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => generateLease(tenant)}><FileText className="mr-2 h-4 w-4" />Générer le bail</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => generateLease(tenant)}><FileText className="mr-2 h-4 w-4" />Générer & Sauvegarder le bail</DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(tenant)}><Trash2 className="mr-2 h-4 w-4"/>Supprimer</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

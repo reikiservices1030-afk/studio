@@ -40,10 +40,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { ref, onValue, push } from "firebase/database";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
 import type { Tenant as TenantType, Payment, OwnerInfo } from '@/types';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 
 const WhatsappIcon = () => (
@@ -184,17 +187,17 @@ export default function PaymentsPage() {
     window.location.href = mailtoUrl;
   };
 
-  const handlePrintReceipt = (payment: Payment) => {
+  const getReceiptHTML = (payment: Payment) => {
     const balance = payment.rentDue - payment.amount;
     const balanceText = balance > 0 ? `<tr><th>Solde restant:</th><td>${balance.toFixed(2)} €</td></tr>` : '<tr><td colspan="2" style="text-align:center; font-weight:bold;">Paiement complet</td></tr>';
-
-     const receiptContent = `
+    
+    return `
       <html>
         <head>
           <title>Reçu de Loyer - ${payment.period}</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 0; padding: 2rem; color: #333; }
-            .container { border: 1px solid #eee; padding: 2rem; border-radius: 10px; max-width: 800px; margin: auto; }
+            .container { border: 1px solid #eee; padding: 2rem; border-radius: 10px; max-width: 800px; margin: auto; background: white; }
             .header { text-align: center; border-bottom: 1px solid #eee; padding-bottom: 1rem; margin-bottom: 2rem;}
             .header h1 { margin: 0; color: #000; }
             .header p { margin: 0; color: #555; }
@@ -241,10 +244,55 @@ export default function PaymentsPage() {
         </body>
       </html>
     `;
-    const printWindow = window.open('', '_blank');
-    printWindow?.document.write(receiptContent);
-    printWindow?.document.close();
-    printWindow?.print();
+  }
+
+  const handlePrintReceipt = async (payment: Payment) => {
+    const receiptHtml = getReceiptHTML(payment);
+
+    // Create a temporary element to render the HTML for PDF conversion
+    const printContainer = document.createElement('div');
+    printContainer.innerHTML = receiptHtml;
+    document.body.appendChild(printContainer);
+    
+    const canvas = await html2canvas(printContainer.querySelector('.container') as HTMLElement);
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    
+    document.body.removeChild(printContainer);
+
+    // Save PDF to Firebase and Database
+    try {
+      toast({ title: "Génération du PDF...", description: "Veuillez patienter." });
+      const pdfBlob = pdf.output('blob');
+      const fileName = `Quittance-${payment.tenantLastName}-${payment.period.replace(' ', '-')}.pdf`;
+      const storagePath = `documents/${fileName}`;
+      const fileStorageRef = storageRef(storage, storagePath);
+
+      await uploadBytes(fileStorageRef, pdfBlob);
+      const downloadURL = await getDownloadURL(fileStorageRef);
+
+      await push(ref(db, "documents"), {
+        name: fileName,
+        type: "application/pdf",
+        size: `${(pdfBlob.size / 1024).toFixed(2)} KB`,
+        uploaded: new Date().toISOString().split('T')[0],
+        url: downloadURL,
+        path: storagePath,
+      });
+
+      toast({ title: "Succès", description: "Reçu sauvegardé dans les documents." });
+
+      // Open print dialog
+      pdf.autoPrint();
+      window.open(pdf.output('bloburl'), '_blank');
+
+    } catch (error) {
+      console.error("Error saving or printing receipt:", error);
+      toast({ variant: "destructive", title: "Erreur", description: "Impossible de sauvegarder ou d'imprimer le reçu." });
+    }
   };
 
   return (
@@ -315,7 +363,7 @@ export default function PaymentsPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handlePrintReceipt(payment)}>
                             <Printer className="mr-2 h-4 w-4" />
-                            Imprimer le reçu
+                            Imprimer & Sauvegarder
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
