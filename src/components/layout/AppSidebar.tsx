@@ -10,6 +10,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import {
   Home,
@@ -30,6 +31,7 @@ import Link from 'next/link';
 
 const AppSidebar = () => {
   const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
   const navItems = [
     { href: '/', label: 'Tableau de bord', icon: LayoutDashboard },
     { href: '/tenants', label: 'Locataires', icon: Users },
@@ -42,6 +44,10 @@ const AppSidebar = () => {
     { href: '/analysis', label: 'Analyse IA', icon: Bot },
     { href: '/indexing', label: 'Indexation', icon: TrendingUp },
   ];
+
+  const handleLinkClick = () => {
+    setOpenMobile(false);
+  };
 
   return (
     <Sidebar>
@@ -59,6 +65,7 @@ const AppSidebar = () => {
                   asChild
                   isActive={pathname === item.href}
                   tooltip={item.label}
+                  onClick={handleLinkClick}
                 >
                   <Link href={item.href}>
                     <item.icon />
@@ -72,7 +79,7 @@ const AppSidebar = () => {
       <SidebarFooter>
         <SidebarMenu>
             <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Paramètres" isActive={pathname === '/settings'}>
+                <SidebarMenuButton asChild tooltip="Paramètres" isActive={pathname === '/settings'} onClick={handleLinkClick}>
                   <Link href="/settings">
                     <Settings />
                     <span>Paramètres</span>
@@ -80,7 +87,7 @@ const AppSidebar = () => {
                 </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Déconnexion">
+                <SidebarMenuButton asChild tooltip="Déconnexion" onClick={handleLinkClick}>
                   <Link href="#">
                     <LogOut />
                     <span>Déconnexion</span>
