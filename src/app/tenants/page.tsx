@@ -532,7 +532,7 @@ export default function TenantsPage() {
 
             <div class="section">
               <h2>Article 3 : Garantie locative</h2>
-              <p>Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer, soit <strong>${tenant.depositAmount.toFixed(2)} €</strong>. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.</p>
+              <p>Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer, soit <strong>${(tenant.depositAmount || 0).toFixed(2)} €</strong>. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.</p>
             </div>
 
             <div class="section signatures">
