@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle, Printer, Loader2, Mail } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Printer, Loader2, Mail, Edit } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,9 +40,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { db, storage } from "@/lib/firebase";
-import { ref, onValue, push } from "firebase/database";
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db } from "@/lib/firebase";
+import { ref, onValue, push, update } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
 import type { Tenant as TenantType, Payment, OwnerInfo } from '@/types';
 import jsPDF from 'jspdf';
@@ -72,11 +71,12 @@ export default function PaymentsPage() {
   const [tenants, setTenants] = useState<TenantType[]>([]);
   const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAddPaymentOpen, setIsAddPaymentOpen] = useState(false);
-  const [newPayment, setNewPayment] = useState({
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentPayment, setCurrentPayment] = useState<Partial<Payment>>({
     tenantId: "",
     date: new Date().toISOString().split('T')[0],
-    amount: "",
+    amount: 0,
     status: "Payé",
     period: `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
   });
@@ -119,42 +119,75 @@ export default function PaymentsPage() {
       unsubOwner();
     };
   }, []);
+  
+  const resetDialog = () => {
+    setIsDialogOpen(false);
+    setIsEditing(false);
+    setCurrentPayment({
+        tenantId: "",
+        date: new Date().toISOString().split('T')[0],
+        amount: 0,
+        status: "Payé",
+        period: `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
+    });
+  };
 
-  const handleAddPayment = async () => {
-    const tenant = tenants.find(t => t.id === newPayment.tenantId);
-    if (!tenant || !newPayment.amount || !newPayment.date) {
+  const handleSavePayment = async () => {
+    const tenant = tenants.find(t => t.id === currentPayment.tenantId);
+    if (!tenant || !currentPayment.amount || !currentPayment.date) {
       toast({ variant: "destructive", title: "Erreur", description: "Veuillez remplir tous les champs."});
       return;
     }
 
     try {
-      await push(ref(db, "payments"), {
-        tenantFirstName: tenant.firstName,
-        tenantLastName: tenant.lastName,
-        tenantId: tenant.id,
-        phone: tenant.phone,
-        email: tenant.email,
-        property: tenant.propertyName,
-        date: newPayment.date,
-        amount: parseFloat(newPayment.amount),
-        status: newPayment.status,
-        period: newPayment.period,
-        rentDue: tenant.rent,
-      });
-      setIsAddPaymentOpen(false);
-      setNewPayment({
-        tenantId: "",
-        date: new Date().toISOString().split('T')[0],
-        amount: "",
-        status: "Payé",
-        period: `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
-      });
-      toast({ title: "Succès", description: "Paiement ajouté."});
+      if (isEditing && currentPayment.id) {
+        const paymentRef = ref(db, `payments/${currentPayment.id}`);
+        await update(paymentRef, {
+            ...currentPayment,
+            amount: Number(currentPayment.amount),
+        });
+        toast({ title: "Succès", description: "Paiement mis à jour."});
+
+      } else {
+        await push(ref(db, "payments"), {
+            tenantFirstName: tenant.firstName,
+            tenantLastName: tenant.lastName,
+            tenantId: tenant.id,
+            phone: tenant.phone,
+            email: tenant.email,
+            property: tenant.propertyName,
+            date: currentPayment.date,
+            amount: Number(currentPayment.amount),
+            status: currentPayment.status,
+            period: currentPayment.period,
+            rentDue: tenant.rent,
+        });
+        toast({ title: "Succès", description: "Paiement ajouté."});
+      }
+      resetDialog();
     } catch (error) {
-       console.error("Error adding payment:", error);
-       toast({ variant: "destructive", title: "Erreur", description: "Impossible d'ajouter le paiement."});
+       console.error("Error saving payment:", error);
+       toast({ variant: "destructive", title: "Erreur", description: "Impossible d'enregistrer le paiement."});
     }
   };
+  
+  const openEditDialog = (payment: Payment) => {
+    setCurrentPayment(payment);
+    setIsEditing(true);
+    setIsDialogOpen(true);
+  };
+  
+  const openAddDialog = () => {
+    setIsEditing(false);
+    setCurrentPayment({
+        tenantId: "",
+        date: new Date().toISOString().split('T')[0],
+        amount: 0,
+        status: "Payé",
+        period: `${new Date().toLocaleString('fr-BE', { month: 'long' })} ${new Date().getFullYear()}`
+    });
+    setIsDialogOpen(true);
+  }
 
   const getReceiptText = (payment: Payment) => {
     const balance = payment.rentDue - payment.amount;
@@ -249,56 +282,36 @@ export default function PaymentsPage() {
   const handlePrintReceipt = async (payment: Payment) => {
     const receiptHtml = getReceiptHTML(payment);
 
-    // Create a temporary element to render the HTML for PDF conversion
     const printContainer = document.createElement('div');
     printContainer.innerHTML = receiptHtml;
     document.body.appendChild(printContainer);
     
-    const canvas = await html2canvas(printContainer.querySelector('.container') as HTMLElement);
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    
-    document.body.removeChild(printContainer);
-
-    // Save PDF to Firebase and Database
     try {
       toast({ title: "Génération du PDF...", description: "Veuillez patienter." });
-      const pdfBlob = pdf.output('blob');
+      const canvas = await html2canvas(printContainer.querySelector('.container') as HTMLElement);
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      
       const fileName = `Quittance-${payment.tenantLastName}-${payment.period.replace(' ', '-')}.pdf`;
-      const storagePath = `documents/${fileName}`;
-      const fileStorageRef = storageRef(storage, storagePath);
-
-      await uploadBytes(fileStorageRef, pdfBlob);
-      const downloadURL = await getDownloadURL(fileStorageRef);
-
-      await push(ref(db, "documents"), {
-        name: fileName,
-        type: "application/pdf",
-        size: `${(pdfBlob.size / 1024).toFixed(2)} KB`,
-        uploaded: new Date().toISOString().split('T')[0],
-        url: downloadURL,
-        path: storagePath,
-      });
-
-      toast({ title: "Succès", description: "Reçu sauvegardé dans les documents." });
-
-      // Open print dialog
-      pdf.autoPrint();
-      window.open(pdf.output('bloburl'), '_blank');
+      pdf.save(fileName);
+      
+      toast({ title: "Succès", description: "Reçu téléchargé." });
 
     } catch (error) {
       console.error("Error saving or printing receipt:", error);
-      toast({ variant: "destructive", title: "Erreur", description: "Impossible de sauvegarder ou d'imprimer le reçu." });
+      toast({ variant: "destructive", title: "Erreur", description: "Impossible de générer le reçu." });
+    } finally {
+        document.body.removeChild(printContainer);
     }
   };
 
   return (
     <div className="flex flex-col h-full">
       <Header title="Paiements">
-        <Button size="sm" className="gap-1" onClick={() => setIsAddPaymentOpen(true)}>
+        <Button size="sm" className="gap-1" onClick={openAddDialog}>
           <PlusCircle className="h-3.5 w-3.5" />
           Ajouter un paiement
         </Button>
@@ -353,6 +366,9 @@ export default function PaymentsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => openEditDialog(payment)}>
+                             <Edit className="mr-2 h-4 w-4" /> Modifier
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleSendReceipt(payment)}>
                             <WhatsappIcon />
                             <span className="ml-2">Envoyer par WhatsApp</span>
@@ -363,7 +379,7 @@ export default function PaymentsPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handlePrintReceipt(payment)}>
                             <Printer className="mr-2 h-4 w-4" />
-                            Imprimer & Sauvegarder
+                            Télécharger le reçu
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -377,12 +393,12 @@ export default function PaymentsPage() {
         </Card>
       </div>
 
-      <Dialog open={isAddPaymentOpen} onOpenChange={setIsAddPaymentOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Ajouter un paiement</DialogTitle>
+            <DialogTitle>{isEditing ? 'Modifier le paiement' : 'Ajouter un paiement'}</DialogTitle>
             <DialogDescription>
-              Enregistrez un nouveau paiement de loyer.
+              {isEditing ? 'Mettez à jour les détails de ce paiement.' : 'Enregistrez un nouveau paiement de loyer.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -391,13 +407,14 @@ export default function PaymentsPage() {
                 <Select 
                     onValueChange={(value) => {
                         const selectedTenant = tenants.find(t => t.id === value);
-                        setNewPayment({
-                            ...newPayment, 
+                        setCurrentPayment({
+                            ...currentPayment, 
                             tenantId: value,
-                            amount: selectedTenant?.rent.toString() || ''
+                            amount: selectedTenant?.rent || 0
                         });
                     }}
-                    value={newPayment.tenantId}
+                    value={currentPayment.tenantId}
+                    disabled={isEditing}
                 >
                     <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Sélectionnez un locataire" />
@@ -411,19 +428,19 @@ export default function PaymentsPage() {
             </div>
              <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="amount" className="text-right">Montant (€)</Label>
-              <Input id="amount" type="number" value={newPayment.amount} onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})} className="col-span-3" />
+              <Input id="amount" type="number" value={currentPayment.amount || ''} onChange={(e) => setCurrentPayment({...currentPayment, amount: Number(e.target.value)})} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="date" className="text-right">Date</Label>
-              <Input id="date" type="date" value={newPayment.date} onChange={(e) => setNewPayment({...newPayment, date: e.target.value})} className="col-span-3" />
+              <Input id="date" type="date" value={currentPayment.date || ''} onChange={(e) => setCurrentPayment({...currentPayment, date: e.target.value})} className="col-span-3" />
             </div>
              <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="period" className="text-right">Période</Label>
-              <Input id="period" value={newPayment.period} onChange={(e) => setNewPayment({...newPayment, period: e.target.value})} className="col-span-3" />
+              <Input id="period" value={currentPayment.period || ''} onChange={(e) => setCurrentPayment({...currentPayment, period: e.target.value})} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="status" className="text-right">Statut</Label>
-                <Select value={newPayment.status} onValueChange={(value) => setNewPayment({...newPayment, status: value})}>
+                <Select value={currentPayment.status} onValueChange={(value) => setCurrentPayment({...currentPayment, status: value})}>
                     <SelectTrigger className="col-span-3">
                         <SelectValue />
                     </SelectTrigger>
@@ -435,8 +452,8 @@ export default function PaymentsPage() {
             </div>
           </div>
           <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
-            <Button onClick={handleAddPayment}>Ajouter</Button>
+            <DialogClose asChild><Button variant="outline" onClick={resetDialog}>Annuler</Button></DialogClose>
+            <Button onClick={handleSavePayment}>{isEditing ? 'Enregistrer' : 'Ajouter'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

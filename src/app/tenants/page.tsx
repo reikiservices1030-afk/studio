@@ -32,6 +32,7 @@ import {
   Upload,
   Trash2,
   ShieldCheck,
+  Mail,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -335,14 +336,22 @@ export default function TenantsPage() {
     }
   }
 
-  const sendMessage = (tenant: Tenant) => {
+  const sendMessage = (tenant: Tenant, message: string) => {
     if (!tenant.phone) {
         toast({ variant: "destructive", title: "Erreur", description: "Numéro de téléphone manquant."});
         return;
     }
-    const message = `Bonjour ${tenant.firstName}, `;
     const whatsappUrl = `https://wa.me/${tenant.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
+  };
+  
+  const sendEmail = (tenant: Tenant, subject: string, body: string) => {
+    if (!tenant.email) {
+      toast({ variant: "destructive", title: "Erreur", description: "Email du locataire manquant."});
+      return;
+    }
+    const mailtoUrl = `mailto:${tenant.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailtoUrl;
   };
 
   const generateLease = async (tenant: Tenant) => {
@@ -442,49 +451,29 @@ export default function TenantsPage() {
       </html>
     `;
     
-    // Create a temporary element to render the HTML for PDF conversion
     const printContainer = document.createElement('div');
     printContainer.innerHTML = leaseContent;
     document.body.appendChild(printContainer);
     
-    const canvas = await html2canvas(printContainer.querySelector('.container') as HTMLElement);
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    
-    document.body.removeChild(printContainer);
-
-    // Save PDF to Firebase and Database
     try {
       toast({ title: "Génération du PDF...", description: "Veuillez patienter." });
-      const pdfBlob = pdf.output('blob');
-      const fileName = `Bail-${tenant.lastName}-${tenant.leaseStart}.pdf`;
-      const storagePath = `documents/${fileName}`;
-      const fileStorageRef = storageRef(storage, storagePath);
-
-      await uploadBytes(fileStorageRef, pdfBlob);
-      const downloadURL = await getDownloadURL(fileStorageRef);
-
-      await push(dbRef(db, "documents"), {
-        name: fileName,
-        type: "application/pdf",
-        size: `${(pdfBlob.size / 1024).toFixed(2)} KB`,
-        uploaded: new Date().toISOString().split('T')[0],
-        url: downloadURL,
-        path: storagePath,
-      });
-
-      toast({ title: "Succès", description: "Bail sauvegardé dans les documents." });
+      const canvas = await html2canvas(printContainer.querySelector('.container') as HTMLElement);
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       
-      // Open print dialog
-      pdf.autoPrint();
-      window.open(pdf.output('bloburl'), '_blank');
+      const fileName = `Bail-${tenant.lastName}-${tenant.leaseStart}.pdf`;
+      pdf.save(fileName);
+
+      toast({ title: "Succès", description: "Bail téléchargé." });
 
     } catch (error) {
       console.error("Error saving or printing lease:", error);
-      toast({ variant: "destructive", title: "Erreur", description: "Impossible de sauvegarder ou d'imprimer le bail." });
+      toast({ variant: "destructive", title: "Erreur", description: "Impossible de générer le bail." });
+    } finally {
+        document.body.removeChild(printContainer);
     }
   };
 
@@ -530,10 +519,11 @@ export default function TenantsPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => openViewDialog(tenant)}><Eye className="mr-2 h-4 w-4" />Voir les détails</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => sendMessage(tenant)}><WhatsappIcon /><span className="ml-2">Envoyer un message</span></DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => sendMessage(tenant, `Bonjour ${tenant.firstName}, `)}><WhatsappIcon /><span className="ml-2">Envoyer WhatsApp</span></DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => sendEmail(tenant, 'Contact', `Bonjour ${tenant.firstName}, `)}><Mail className="mr-2 h-4 w-4" />Envoyer Email</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openDepositDialog(tenant)}><ShieldCheck className="mr-2 h-4 w-4" />Gérer la caution</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openEditDialog(tenant)}><Edit className="mr-2 h-4 w-4" />Modifier</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => generateLease(tenant)}><FileText className="mr-2 h-4 w-4" />Générer & Sauvegarder le bail</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => generateLease(tenant)}><FileText className="mr-2 h-4 w-4" />Télécharger le bail</DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(tenant)}><Trash2 className="mr-2 h-4 w-4"/>Supprimer</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
