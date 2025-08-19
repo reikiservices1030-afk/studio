@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle, Loader2 } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Loader2, MessageSquare, Eye, Edit } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,7 +40,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, deleteDoc, doc, DocumentData } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, DocumentData } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 type Tenant = {
@@ -54,10 +54,18 @@ type Tenant = {
   leaseEnd: string;
 };
 
+const WhatsappIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+);
+
+
 export default function TenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddTenantOpen, setIsAddTenantOpen] = useState(false);
+  const [isEditTenantOpen, setIsEditTenantOpen] = useState(false);
+  const [isViewTenantOpen, setIsViewTenantOpen] = useState(false);
+  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [newTenant, setNewTenant] = useState({
     name: "",
     email: "",
@@ -117,6 +125,62 @@ export default function TenantsPage() {
         description: "Impossible d'ajouter le locataire.",
       });
     }
+  }
+
+  const handleEditTenant = async () => {
+    if (!selectedTenant) return;
+     if (!selectedTenant.name || !selectedTenant.email) {
+       toast({
+        variant: "destructive",
+        title: "Champs requis",
+        description: "Le nom et l'email sont obligatoires.",
+      });
+      return;
+    }
+    try {
+      const tenantRef = doc(db, "tenants", selectedTenant.id);
+      await updateDoc(tenantRef, {
+        name: selectedTenant.name,
+        email: selectedTenant.email,
+        phone: selectedTenant.phone,
+        nationalId: selectedTenant.nationalId,
+        property: selectedTenant.property,
+        leaseEnd: selectedTenant.leaseEnd,
+      });
+      setIsEditTenantOpen(false);
+      setSelectedTenant(null);
+      toast({
+        title: "Succès",
+        description: "Informations du locataire mises à jour.",
+      });
+    } catch (error) {
+       console.error("Error updating tenant: ", error);
+       toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de mettre à jour le locataire.",
+      });
+    }
+  };
+  
+  const openEditDialog = (tenant: Tenant) => {
+    setSelectedTenant(tenant);
+    setIsEditTenantOpen(true);
+  };
+
+  const openViewDialog = (tenant: Tenant) => {
+    setSelectedTenant(tenant);
+    setIsViewTenantOpen(true);
+  }
+
+  const sendMessage = (tenant: Tenant) => {
+    if (!tenant.phone) {
+      toast({ variant: "destructive", title: "Erreur", description: "Numéro de téléphone manquant."});
+      return;
+    }
+    const message = `Bonjour ${tenant.name}, `;
+    const whatsappUrl = `https://wa.me/${tenant.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
   }
 
   const handleDeleteTenant = async (id: string) => {
@@ -194,9 +258,18 @@ export default function TenantsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem>Voir les détails</DropdownMenuItem>
-                          <DropdownMenuItem>Envoyer un message</DropdownMenuItem>
-                          <DropdownMenuItem>Modifier</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openViewDialog(tenant)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Voir les détails
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => sendMessage(tenant)}>
+                            <WhatsappIcon />
+                            <span className="ml-2">Envoyer un message</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openEditDialog(tenant)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Modifier
+                          </DropdownMenuItem>
                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteTenant(tenant.id)}>Supprimer</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -210,6 +283,7 @@ export default function TenantsPage() {
         </Card>
       </div>
 
+      {/* Add Tenant Dialog */}
        <Dialog open={isAddTenantOpen} onOpenChange={setIsAddTenantOpen}>
         <DialogContent>
           <DialogHeader>
@@ -249,6 +323,96 @@ export default function TenantsPage() {
             <Button onClick={handleAddTenant}>Ajouter</Button>
           </DialogFooter>
         </DialogContent>
+      </Dialog>
+      
+      {/* Edit Tenant Dialog */}
+      <Dialog open={isEditTenantOpen} onOpenChange={setIsEditTenantOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier les informations du locataire</DialogTitle>
+            <DialogDescription>
+              Mettez à jour les détails ci-dessous.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedTenant && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name-edit" className="text-right">Nom</Label>
+                <Input id="name-edit" value={selectedTenant.name} onChange={(e) => setSelectedTenant({...selectedTenant, name: e.target.value})} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email-edit" className="text-right">Email</Label>
+                <Input id="email-edit" value={selectedTenant.email} onChange={(e) => setSelectedTenant({...selectedTenant, email: e.target.value})} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="phone-edit" className="text-right">Téléphone</Label>
+                <Input id="phone-edit" value={selectedTenant.phone} onChange={(e) => setSelectedTenant({...selectedTenant, phone: e.target.value})} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="nationalId-edit" className="text-right">N° National</Label>
+                <Input id="nationalId-edit" value={selectedTenant.nationalId} onChange={(e) => setSelectedTenant({...selectedTenant, nationalId: e.target.value})} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="property-edit" className="text-right">Propriété</Label>
+                <Input id="property-edit" value={selectedTenant.property} onChange={(e) => setSelectedTenant({...selectedTenant, property: e.target.value})} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="leaseEnd-edit" className="text-right">Fin du bail</Label>
+                <Input id="leaseEnd-edit" type="date" value={selectedTenant.leaseEnd} onChange={(e) => setSelectedTenant({...selectedTenant, leaseEnd: e.target.value})} className="col-span-3" />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
+            <Button onClick={handleEditTenant}>Enregistrer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Tenant Dialog */}
+      <Dialog open={isViewTenantOpen} onOpenChange={setIsViewTenantOpen}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Détails du locataire</DialogTitle>
+              </DialogHeader>
+              {selectedTenant && (
+                  <div className="grid gap-4 py-4 text-sm">
+                      <div className="grid grid-cols-3 gap-2">
+                          <p className="text-muted-foreground">Nom:</p>
+                          <p className="col-span-2 font-medium">{selectedTenant.name}</p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                          <p className="text-muted-foreground">Email:</p>
+                          <p className="col-span-2 font-medium">{selectedTenant.email}</p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                          <p className="text-muted-foreground">Téléphone:</p>
+                          <p className="col-span-2 font-medium">{selectedTenant.phone}</p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                          <p className="text-muted-foreground">N° National:</p>
+                          <p className="col-span-2 font-medium">{selectedTenant.nationalId}</p>
+                      </div>
+                       <div className="grid grid-cols-3 gap-2">
+                          <p className="text-muted-foreground">Propriété:</p>
+                          <p className="col-span-2 font-medium">{selectedTenant.property}</p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                          <p className="text-muted-foreground">Fin du bail:</p>
+                          <p className="col-span-2 font-medium">{selectedTenant.leaseEnd}</p>
+                      </div>
+                       <div className="grid grid-cols-3 gap-2">
+                          <p className="text-muted-foreground">Statut:</p>
+                           <p className="col-span-2 font-medium"> <Badge variant={selectedTenant.status === 'Actif' ? 'secondary' : 'destructive'}>{selectedTenant.status}</Badge></p>
+                      </div>
+                  </div>
+              )}
+              <DialogFooter>
+                  <DialogClose asChild>
+                      <Button variant="outline">Fermer</Button>
+                  </DialogClose>
+              </DialogFooter>
+          </DialogContent>
       </Dialog>
     </div>
   );
