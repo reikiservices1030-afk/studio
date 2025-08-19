@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { PlusCircle, Loader2, Upload, MoreHorizontal, Trash2, Edit } from 'lucide-react';
+import { PlusCircle, Loader2, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -31,30 +31,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { db, storage } from '@/lib/firebase';
+import { ref as dbRef, onValue, push, remove, update } from "firebase/database";
 import {
-  collection,
-  addDoc,
-  onSnapshot,
-  deleteDoc,
-  doc,
-  updateDoc,
-  DocumentData,
-} from 'firebase/firestore';
-import {
-  ref,
+  ref as storageRef,
   uploadBytes,
   getDownloadURL,
   deleteObject,
 } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
-
-type Property = {
-  id: string;
-  address: string;
-  rent: number;
-  imageUrl: string;
-  imagePath: string;
-};
+import type { Property } from '@/types';
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -68,13 +53,17 @@ export default function PropertiesPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, 'properties'),
+    const propertiesRef = dbRef(db, 'properties');
+    const unsubscribe = onValue(
+      propertiesRef,
       (snapshot) => {
         const propsData: Property[] = [];
-        snapshot.forEach((doc: DocumentData) => {
-          propsData.push({ id: doc.id, ...doc.data() } as Property);
-        });
+        const val = snapshot.val();
+        if (val) {
+          Object.keys(val).forEach((key) => {
+            propsData.push({ id: key, ...val[key] });
+          });
+        }
         setProperties(propsData);
         setLoading(false);
       }
@@ -112,16 +101,15 @@ export default function PropertiesPage() {
 
     try {
       if (imageFile) {
-        // If it's an edit and there's an old image, delete it
         if (isEditing && currentProperty.imagePath) {
-            const oldImageRef = ref(storage, currentProperty.imagePath);
+            const oldImageRef = storageRef(storage, currentProperty.imagePath);
             await deleteObject(oldImageRef).catch(err => console.error("Could not delete old image, may not exist", err));
         }
 
         const newImagePath = `properties/${Date.now()}_${imageFile.name}`;
-        const storageRef = ref(storage, newImagePath);
-        await uploadBytes(storageRef, imageFile);
-        imageUrl = await getDownloadURL(storageRef);
+        const newImageRef = storageRef(storage, newImagePath);
+        await uploadBytes(newImageRef, imageFile);
+        imageUrl = await getDownloadURL(newImageRef);
         imagePath = newImagePath;
       }
 
@@ -133,11 +121,12 @@ export default function PropertiesPage() {
       };
 
       if (isEditing && currentProperty.id) {
-        const propertyRef = doc(db, 'properties', currentProperty.id);
-        await updateDoc(propertyRef, propertyData);
+        const propertyRef = dbRef(db, `properties/${currentProperty.id}`);
+        await update(propertyRef, propertyData);
         toast({ title: 'Succès', description: 'Propriété mise à jour.' });
       } else {
-        await addDoc(collection(db, 'properties'), propertyData);
+        const propertiesRef = dbRef(db, 'properties');
+        await push(propertiesRef, propertyData);
         toast({ title: 'Succès', description: 'Propriété ajoutée.' });
       }
       resetDialog();
@@ -157,10 +146,10 @@ export default function PropertiesPage() {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cette propriété ?')) {
       try {
         if (property.imagePath) {
-          const imageRef = ref(storage, property.imagePath);
+          const imageRef = storageRef(storage, property.imagePath);
           await deleteObject(imageRef);
         }
-        await deleteDoc(doc(db, 'properties', property.id));
+        await remove(dbRef(db, `properties/${property.id}`));
         toast({ title: 'Succès', description: 'Propriété supprimée.' });
       } catch (error) {
         console.error('Error deleting property:', error);

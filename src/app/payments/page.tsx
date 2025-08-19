@@ -41,31 +41,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, doc, DocumentData } from "firebase/firestore";
+import { ref, onValue, push } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
+import type { Tenant as TenantType, Payment } from '@/types';
 
-
-type Payment = {
-  id: string;
-  tenant: string;
-  tenantId: string;
-  phone: string;
-  email: string;
-  property: string;
-  date: string;
-  amount: number;
-  status: string;
-  period: string;
-};
-
-type Tenant = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
-  email: string;
-  propertyName: string;
-};
 
 const WhatsappIcon = () => (
     <svg
@@ -87,7 +66,7 @@ const WhatsappIcon = () => (
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [tenants, setTenants] = useState<TenantType[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddPaymentOpen, setIsAddPaymentOpen] = useState(false);
   const [newPayment, setNewPayment] = useState({
@@ -100,20 +79,28 @@ export default function PaymentsPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubPayments = onSnapshot(collection(db, "payments"), (snapshot) => {
+    const paymentsRef = ref(db, "payments");
+    const unsubPayments = onValue(paymentsRef, (snapshot) => {
       const paymentsData: Payment[] = [];
-      snapshot.forEach((doc: DocumentData) => {
-        paymentsData.push({ id: doc.id, ...doc.data() } as Payment);
-      });
+      const val = snapshot.val();
+      if (val) {
+        Object.keys(val).forEach((key) => {
+          paymentsData.push({ id: key, ...val[key] });
+        });
+      }
       setPayments(paymentsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       setLoading(false);
     });
 
-    const unsubTenants = onSnapshot(collection(db, "tenants"), (snapshot) => {
-      const tenantsData: Tenant[] = [];
-      snapshot.forEach((doc: DocumentData) => {
-        tenantsData.push({ id: doc.id, ...doc.data() } as Tenant);
-      });
+    const tenantsRef = ref(db, "tenants");
+    const unsubTenants = onValue(tenantsRef, (snapshot) => {
+      const tenantsData: TenantType[] = [];
+      const val = snapshot.val();
+       if (val) {
+        Object.keys(val).forEach((key) => {
+          tenantsData.push({ id: key, ...val[key] });
+        });
+      }
       setTenants(tenantsData);
     });
 
@@ -131,8 +118,9 @@ export default function PaymentsPage() {
     }
 
     try {
-      await addDoc(collection(db, "payments"), {
-        tenant: `${tenant.firstName} ${tenant.lastName}`,
+      await push(ref(db, "payments"), {
+        tenantFirstName: tenant.firstName,
+        tenantLastName: tenant.lastName,
         tenantId: tenant.id,
         phone: tenant.phone,
         email: tenant.email,
@@ -158,7 +146,7 @@ export default function PaymentsPage() {
   };
 
   const getReceiptText = (payment: Payment) => {
-    return `Bonjour ${payment.tenant},\n\nVoici votre reçu pour le loyer de ${payment.period}.\n\n- Montant : ${payment.amount.toFixed(2)} €\n- Date de paiement : ${payment.date}\n- Propriété : ${payment.property}\n\nCordialement.`;
+    return `Bonjour ${payment.tenantFirstName} ${payment.tenantLastName},\n\nVoici votre reçu pour le loyer de ${payment.period}.\n\n- Montant : ${payment.amount.toFixed(2)} €\n- Date de paiement : ${payment.date}\n- Propriété : ${payment.property}\n\nCordialement.`;
   }
 
   const handleSendReceipt = (payment: Payment) => {
@@ -211,7 +199,7 @@ export default function PaymentsPage() {
             <div class="details">
               <table>
                 <tr><th>Propriétaire:</th><td>[Nom du propriétaire]</td></tr>
-                <tr><th>Locataire:</th><td>${payment.tenant}</td></tr>
+                <tr><th>Locataire:</th><td>${payment.tenantFirstName} ${payment.tenantLastName}</td></tr>
                 <tr><th>Propriété louée:</th><td>${payment.property}</td></tr>
                 <tr><th>Date du paiement:</th><td>${payment.date}</td></tr>
               </table>
@@ -270,7 +258,7 @@ export default function PaymentsPage() {
                 {payments.map((payment) => (
                   <TableRow key={payment.id}>
                     <TableCell>
-                      <div className="font-medium">{payment.tenant}</div>
+                      <div className="font-medium">{payment.tenantFirstName} {payment.tenantLastName}</div>
                       <div className="text-sm text-muted-foreground">{payment.property}</div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{payment.date}</TableCell>

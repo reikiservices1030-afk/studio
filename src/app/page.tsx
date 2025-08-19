@@ -4,7 +4,7 @@
 import { Header } from '@/components/layout/Header';
 import { DashboardClient } from './dashboard-client';
 import { db } from '@/lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { ref, get } from 'firebase/database';
 import type { Payment, Property, Tenant, Reminder } from '@/types';
 
 type DashboardData = {
@@ -20,16 +20,21 @@ async function getDashboardData(): Promise<DashboardData> {
   try {
     // Fetch all necessary data in parallel
     const [propertiesSnap, tenantsSnap, paymentsSnap, remindersSnap] = await Promise.all([
-      getDocs(collection(db, 'properties')),
-      getDocs(collection(db, 'tenants')),
-      getDocs(collection(db, 'payments')),
-      getDocs(collection(db, 'reminders'))
+      get(ref(db, 'properties')),
+      get(ref(db, 'tenants')),
+      get(ref(db, 'payments')),
+      get(ref(db, 'reminders'))
     ]);
 
-    const properties = propertiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
-    const tenants = tenantsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tenant));
-    const payments = paymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-    const reminders = remindersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reminder));
+    const propertiesData = propertiesSnap.val() || {};
+    const tenantsData = tenantsSnap.val() || {};
+    const paymentsData = paymentsSnap.val() || {};
+    const remindersData = remindersSnap.val() || {};
+    
+    const properties: Property[] = Object.entries(propertiesData).map(([id, data]) => ({ id, ...(data as Omit<Property, 'id'>) }));
+    const tenants: Tenant[] = Object.entries(tenantsData).map(([id, data]) => ({ id, ...(data as Omit<Tenant, 'id'>) }));
+    const payments: Payment[] = Object.entries(paymentsData).map(([id, data]) => ({ id, ...(data as Omit<Payment, 'id'>) }));
+    const reminders: Reminder[] = Object.entries(remindersData).map(([id, data]) => ({ id, ...(data as Omit<Reminder, 'id'>) }));
 
     // 1. Total Revenue
     const totalRevenue = payments.reduce((acc, payment) => acc + (payment.status === 'Payé' ? payment.amount : 0), 0);
@@ -85,7 +90,7 @@ async function getDashboardData(): Promise<DashboardData> {
       .slice(0, 4)
       .map(p => ({
         id: p.id,
-        tenant: p.tenant,
+        tenant: `${p.tenantFirstName} ${p.tenantLastName}`,
         activity: `Loyer payé (${p.period})`,
         status: p.status,
       }));

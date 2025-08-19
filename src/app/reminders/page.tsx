@@ -41,28 +41,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, doc, updateDoc, DocumentData } from "firebase/firestore";
+import { ref, onValue, push, update } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
-
-type Reminder = {
-  id: string;
-  tenant: string;
-  tenantId: string;
-  property: string;
-  dueDate: string;
-  amount: number;
-  status: "Envoyé" | "En attente" | "Programmé";
-};
-
-type Tenant = {
-  id: string;
-  name: string;
-  property: string;
-};
+import type { Tenant as TenantType, Reminder } from '@/types';
 
 export default function RemindersPage() {
     const [reminders, setReminders] = useState<Reminder[]>([]);
-    const [tenants, setTenants] = useState<Tenant[]>([]);
+    const [tenants, setTenants] = useState<TenantType[]>([]);
     const [loading, setLoading] = useState(true);
     const [isAddReminderOpen, setIsAddReminderOpen] = useState(false);
     const [newReminder, setNewReminder] = useState({
@@ -73,20 +58,28 @@ export default function RemindersPage() {
     const { toast } = useToast();
 
     useEffect(() => {
-        const unsubReminders = onSnapshot(collection(db, "reminders"), (snapshot) => {
+        const remindersRef = ref(db, "reminders");
+        const unsubReminders = onValue(remindersRef, (snapshot) => {
           const data: Reminder[] = [];
-          snapshot.forEach((doc: DocumentData) => {
-            data.push({ id: doc.id, ...doc.data() } as Reminder);
-          });
+          const val = snapshot.val();
+          if (val) {
+            Object.keys(val).forEach((key) => {
+              data.push({ id: key, ...val[key] });
+            });
+          }
           setReminders(data.sort((a,b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()));
           setLoading(false);
         });
 
-        const unsubTenants = onSnapshot(collection(db, "tenants"), (snapshot) => {
-          const data: Tenant[] = [];
-          snapshot.forEach((doc: DocumentData) => {
-            data.push({ id: doc.id, ...doc.data() } as Tenant);
-          });
+        const tenantsRef = ref(db, "tenants");
+        const unsubTenants = onValue(tenantsRef, (snapshot) => {
+          const data: TenantType[] = [];
+          const val = snapshot.val();
+          if (val) {
+             Object.keys(val).forEach((key) => {
+              data.push({ id: key, ...val[key] });
+            });
+          }
           setTenants(data);
         });
 
@@ -104,10 +97,10 @@ export default function RemindersPage() {
         }
 
         try {
-            await addDoc(collection(db, "reminders"), {
-                tenant: tenant.name,
+            await push(ref(db, "reminders"), {
+                tenant: `${tenant.firstName} ${tenant.lastName}`,
                 tenantId: tenant.id,
-                property: tenant.property,
+                property: tenant.propertyName,
                 dueDate: newReminder.dueDate,
                 amount: parseFloat(newReminder.amount),
                 status: "Programmé"
@@ -123,8 +116,8 @@ export default function RemindersPage() {
     
     const sendReminder = async (id: string) => {
         try {
-            const reminderRef = doc(db, "reminders", id);
-            await updateDoc(reminderRef, { status: "Envoyé" });
+            const reminderRef = ref(db, `reminders/${id}`);
+            await update(reminderRef, { status: "Envoyé" });
             toast({ title: "Succès", description: "Rappel marqué comme envoyé." });
         } catch (error) {
              console.error("Error sending reminder:", error);
@@ -223,7 +216,7 @@ export default function RemindersPage() {
                     </SelectTrigger>
                     <SelectContent>
                         {tenants.map(t => (
-                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                            <SelectItem key={t.id} value={t.id}>{t.firstName} {t.lastName}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>

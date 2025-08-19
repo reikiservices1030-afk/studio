@@ -27,7 +27,8 @@ export type Property = {
 
 export type Payment = {
   id: string;
-  tenant: string;
+  tenantFirstName: string;
+  tenantLastName: string;
   tenantId: string;
   phone: string;
   email: string;

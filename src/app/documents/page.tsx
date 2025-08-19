@@ -28,8 +28,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { db, storage } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, deleteDoc, doc, DocumentData } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref as dbRef, onValue, push, remove } from "firebase/database";
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
 
 type Document = {
@@ -57,11 +57,15 @@ export default function DocumentsPage() {
     const { toast } = useToast();
 
     useEffect(() => {
-      const unsubscribe = onSnapshot(collection(db, "documents"), (snapshot) => {
+      const documentsRef = dbRef(db, "documents");
+      const unsubscribe = onValue(documentsRef, (snapshot) => {
         const docsData: Document[] = [];
-        snapshot.forEach((doc: DocumentData) => {
-          docsData.push({ id: doc.id, ...doc.data() } as Document);
-        });
+        const val = snapshot.val();
+        if (val) {
+          Object.keys(val).forEach((key) => {
+            docsData.push({ id: key, ...val[key] });
+          });
+        }
         setDocuments(docsData.sort((a,b) => new Date(b.uploaded).getTime() - new Date(a.uploaded).getTime()));
         setLoading(false);
       });
@@ -78,11 +82,11 @@ export default function DocumentsPage() {
             setUploading(true);
             try {
                 const storagePath = `documents/${Date.now()}_${file.name}`;
-                const storageRef = ref(storage, storagePath);
-                await uploadBytes(storageRef, file);
-                const downloadURL = await getDownloadURL(storageRef);
+                const fileStorageRef = storageRef(storage, storagePath);
+                await uploadBytes(fileStorageRef, file);
+                const downloadURL = await getDownloadURL(fileStorageRef);
 
-                await addDoc(collection(db, "documents"), {
+                await push(dbRef(db, "documents"), {
                     name: file.name,
                     type: file.type,
                     size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
@@ -97,7 +101,6 @@ export default function DocumentsPage() {
                 toast({ variant: "destructive", title: "Erreur", description: "Impossible de télécharger le document." });
             } finally {
                 setUploading(false);
-                // Reset file input
                 if(fileInputRef.current) fileInputRef.current.value = "";
             }
         }
@@ -107,11 +110,11 @@ export default function DocumentsPage() {
         if (window.confirm("Êtes-vous sûr de vouloir supprimer ce document ?")) {
             try {
                 // Delete file from storage
-                const fileRef = ref(storage, docToDelete.path);
+                const fileRef = storageRef(storage, docToDelete.path);
                 await deleteObject(fileRef);
 
-                // Delete doc from firestore
-                await deleteDoc(doc(db, "documents", docToDelete.id));
+                // Delete doc from database
+                await remove(dbRef(db, `documents/${docToDelete.id}`));
 
                 toast({ title: "Succès", description: "Document supprimé." });
 

@@ -52,17 +52,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { db, storage } from '@/lib/firebase';
+import { ref as dbRef, onValue, push, remove, update, set } from "firebase/database";
 import {
-  collection,
-  addDoc,
-  onSnapshot,
-  deleteDoc,
-  doc,
-  updateDoc,
-  DocumentData,
-} from 'firebase/firestore';
-import {
-  ref,
+  ref as storageRef,
   uploadBytes,
   getDownloadURL,
   deleteObject,
@@ -109,20 +101,28 @@ export default function TenantsPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubTenants = onSnapshot(collection(db, 'tenants'), (snapshot) => {
+    const tenantsRef = dbRef(db, 'tenants');
+    const unsubTenants = onValue(tenantsRef, (snapshot) => {
       const tenantsData: Tenant[] = [];
-      snapshot.forEach((doc: DocumentData) => {
-        tenantsData.push({ id: doc.id, ...doc.data() } as Tenant);
-      });
+      const val = snapshot.val();
+      if (val) {
+        Object.keys(val).forEach((key) => {
+          tenantsData.push({ id: key, ...val[key] });
+        });
+      }
       setTenants(tenantsData);
       setLoading(false);
     });
 
-    const unsubProperties = onSnapshot(collection(db, 'properties'), (snapshot) => {
+    const propertiesRef = dbRef(db, 'properties');
+    const unsubProperties = onValue(propertiesRef, (snapshot) => {
         const propsData: Property[] = [];
-        snapshot.forEach((doc: DocumentData) => {
-            propsData.push({ id: doc.id, ...doc.data() } as Property);
-        });
+        const val = snapshot.val();
+        if (val) {
+          Object.keys(val).forEach((key) => {
+            propsData.push({ id: key, ...val[key] });
+          });
+        }
         setProperties(propsData);
     });
 
@@ -220,14 +220,14 @@ export default function TenantsPage() {
     try {
         if (idCardFile) {
             if (isEditing && currentTenant.idCardPath) {
-                const oldImageRef = ref(storage, currentTenant.idCardPath);
+                const oldImageRef = storageRef(storage, currentTenant.idCardPath);
                 await deleteObject(oldImageRef).catch(err => console.error("Could not delete old image", err));
             }
             const fileExtension = idCardFile.name.split('.').pop();
             const newImagePath = `id_cards/${nationalId}.${fileExtension}`;
-            const storageRef = ref(storage, newImagePath);
-            await uploadBytes(storageRef, idCardFile);
-            idCardUrl = await getDownloadURL(storageRef);
+            const newImageRef = storageRef(storage, newImagePath);
+            await uploadBytes(newImageRef, idCardFile);
+            idCardUrl = await getDownloadURL(newImageRef);
             idCardPath = newImagePath;
         }
 
@@ -251,11 +251,12 @@ export default function TenantsPage() {
         };
 
         if (isEditing && currentTenant.id) {
-            const tenantRef = doc(db, 'tenants', currentTenant.id);
-            await updateDoc(tenantRef, tenantData);
+            const tenantRef = dbRef(db, `tenants/${currentTenant.id}`);
+            await set(tenantRef, tenantData);
             toast({ title: 'Succès', description: 'Locataire mis à jour.' });
         } else {
-            await addDoc(collection(db, 'tenants'), tenantData);
+            const tenantsRef = dbRef(db, 'tenants');
+            await push(tenantsRef, tenantData);
             toast({ title: 'Succès', description: 'Nouveau locataire ajouté.' });
         }
         resetDialog();
@@ -271,10 +272,10 @@ export default function TenantsPage() {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer ce locataire ?')) {
       try {
         if (tenant.idCardPath) {
-          const imageRef = ref(storage, tenant.idCardPath);
+          const imageRef = storageRef(storage, tenant.idCardPath);
           await deleteObject(imageRef);
         }
-        await deleteDoc(doc(db, 'tenants', tenant.id));
+        await remove(dbRef(db, `tenants/${tenant.id}`));
         toast({ title: 'Succès', description: 'Locataire supprimé.' });
       } catch (error)
         {
