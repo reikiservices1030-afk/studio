@@ -8,9 +8,7 @@ export function useIsMobile() {
   React.useEffect(() => {
     // This function now safely checks for the window object.
     const checkDevice = () => {
-      if (typeof window !== 'undefined') {
-        setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-      }
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
     };
     
     // Initial check on the client-side after mount.
