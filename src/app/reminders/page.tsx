@@ -49,6 +49,7 @@ export default function RemindersPage() {
     const [reminders, setReminders] = useState<Reminder[]>([]);
     const [tenants, setTenants] = useState<TenantType[]>([]);
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [isAddReminderOpen, setIsAddReminderOpen] = useState(false);
     const [newReminder, setNewReminder] = useState({
         tenantId: "",
@@ -95,7 +96,7 @@ export default function RemindersPage() {
             toast({ variant: "destructive", title: "Erreur", description: "Veuillez remplir tous les champs." });
             return;
         }
-
+        setSaving(true);
         try {
             await push(ref(db, "reminders"), {
                 tenant: `${tenant.firstName} ${tenant.lastName}`,
@@ -111,6 +112,8 @@ export default function RemindersPage() {
         } catch (error) {
             console.error("Error adding reminder:", error);
             toast({ variant: "destructive", title: "Erreur", description: "Impossible de programmer le rappel." });
+        } finally {
+            setSaving(false);
         }
     }
     
@@ -232,7 +235,10 @@ export default function RemindersPage() {
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
-            <Button onClick={handleAddReminder}>Programmer</Button>
+            <Button onClick={handleAddReminder} disabled={saving}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Programmer
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

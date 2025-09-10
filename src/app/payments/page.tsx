@@ -72,6 +72,7 @@ export default function PaymentsPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [ownerInfo, setOwnerInfo] = useState<OwnerInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentPayment, setCurrentPayment] = useState<Partial<Payment>>({
@@ -227,7 +228,7 @@ export default function PaymentsPage() {
       toast({ variant: "destructive", title: "Erreur", description: "Veuillez remplir tous les champs."});
       return;
     }
-    
+    setSaving(true);
     let rentDue = 0;
     if (currentPayment.type === 'Loyer') {
         rentDue = tenant.rent || 0;
@@ -266,6 +267,8 @@ export default function PaymentsPage() {
     } catch (error) {
        console.error("Error saving payment:", error);
        toast({ variant: "destructive", title: "Erreur", description: "Impossible d'enregistrer le paiement."});
+    } finally {
+        setSaving(false);
     }
   };
   
@@ -626,7 +629,10 @@ export default function PaymentsPage() {
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="outline" onClick={resetDialog}>Annuler</Button></DialogClose>
-            <Button onClick={handleSavePayment}>{isEditing ? 'Enregistrer' : 'Ajouter'}</Button>
+            <Button onClick={handleSavePayment} disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEditing ? 'Enregistrer' : 'Ajouter'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

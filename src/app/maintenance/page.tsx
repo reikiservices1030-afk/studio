@@ -67,6 +67,7 @@ export default function MaintenancePage() {
     const [properties, setProperties] = useState<Property[]>([]);
     const [tenants, setTenants] = useState<Tenant[]>([]);
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [currentMaintenance, setCurrentMaintenance] = useState<Partial<Maintenance>>({});
@@ -116,7 +117,7 @@ export default function MaintenancePage() {
             toast({ variant: "destructive", title: "Erreur", description: "Veuillez remplir tous les champs obligatoires." });
             return;
         }
-
+        setSaving(true);
         const property = properties.find(p => p.id === propertyId);
         const tenant = tenants.find(t => t.id === currentMaintenance.tenantId);
 
@@ -139,6 +140,8 @@ export default function MaintenancePage() {
         } catch (error) {
             console.error("Error saving maintenance:", error);
             toast({ variant: "destructive", title: "Erreur", description: "Impossible d'enregistrer la maintenance." });
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -308,7 +311,10 @@ export default function MaintenancePage() {
                     </div>
                     <DialogFooter>
                         <DialogClose asChild><Button variant="outline" onClick={resetDialog}>Annuler</Button></DialogClose>
-                        <Button onClick={handleSave}>{isEditing ? 'Enregistrer' : 'Ajouter'}</Button>
+                        <Button onClick={handleSave} disabled={saving}>
+                            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isEditing ? 'Enregistrer' : 'Ajouter'}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
