@@ -28,21 +28,15 @@ import { Euro, TrendingUp, TrendingDown, Landmark } from "lucide-react";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 
 const financialData = [
-  { month: "Jan", income: 4000, expenses: 2400 },
-  { month: "Fév", income: 3000, expenses: 1398 },
-  { month: "Mar", income: 5000, expenses: 3800 },
-  { month: "Avr", income: 4500, expenses: 2908 },
-  { month: "Mai", income: 6000, expenses: 4800 },
-  { month: "Juin", income: 5500, expenses: 3800 },
+  { month: "Jan", income: 0, expenses: 0 },
+  { month: "Fév", income: 0, expenses: 0 },
+  { month: "Mar", income: 0, expenses: 0 },
+  { month: "Avr", income: 0, expenses: 0 },
+  { month: "Mai", income: 0, expenses: 0 },
+  { month: "Juin", income: 0, expenses: 0 },
 ];
 
-const transactions = [
-    {id: 1, date: "2024-07-25", description: "Réparation plomberie - Appt 101", type: "Dépense", amount: 250},
-    {id: 2, date: "2024-07-20", description: "Loyer - Chloé Lambert", type: "Revenu", amount: 950},
-    {id: 3, date: "2024-07-18", description: "Services de jardinage", type: "Dépense", amount: 150},
-    {id: 4, date: "2024-07-15", description: "Loyer - Lucas Dubois", type: "Revenu", amount: 1200},
-    {id: 5, date: "2024-07-10", description: "Assurance incendie", type: "Dépense", amount: 450},
-];
+const transactions: {id: number, date: string, description: string, type: "Revenu" | "Dépense", amount: number}[] = [];
 
 export function ReportsClient() {
     return (
@@ -54,7 +48,7 @@ export function ReportsClient() {
                         <TrendingUp className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">125,430.50 €</div>
+                        <div className="text-2xl font-bold">0.00 €</div>
                         <p className="text-xs text-muted-foreground">Depuis le début de l'année</p>
                     </CardContent>
                 </Card>
@@ -64,7 +58,7 @@ export function ReportsClient() {
                         <TrendingDown className="h-4 w-4 text-red-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">60,120.90 €</div>
+                        <div className="text-2xl font-bold">0.00 €</div>
                         <p className="text-xs text-muted-foreground">Depuis le début de l'année</p>
                     </CardContent>
                 </Card>
@@ -74,7 +68,7 @@ export function ReportsClient() {
                         <Landmark className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">65,309.60 €</div>
+                        <div className="text-2xl font-bold">0.00 €</div>
                         <p className="text-xs text-muted-foreground">Depuis le début de l'année</p>
                     </CardContent>
                 </Card>
@@ -84,7 +78,7 @@ export function ReportsClient() {
                         <Euro className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">52.1%</div>
+                        <div className="text-2xl font-bold">0%</div>
                         <p className="text-xs text-muted-foreground">Depuis le début de l'année</p>
                     </CardContent>
                 </Card>
@@ -140,7 +134,7 @@ export function ReportsClient() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {transactions.map(tx => (
+                            {transactions.length > 0 ? transactions.map(tx => (
                                 <TableRow key={tx.id}>
                                     <TableCell>{tx.date}</TableCell>
                                     <TableCell className="font-medium">{tx.description}</TableCell>
@@ -151,7 +145,11 @@ export function ReportsClient() {
                                         {tx.type === 'Dépense' ? '-' : ''}{tx.amount.toFixed(2)} €
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )) : (
+                              <TableRow>
+                                <TableCell colSpan={4} className="text-center text-muted-foreground">Aucune transaction</TableCell>
+                              </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>
