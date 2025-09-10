@@ -26,19 +26,22 @@ import {
 } from "recharts";
 import { Euro, TrendingUp, TrendingDown, Landmark } from "lucide-react";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
+import type { ReportsData } from "./actions";
 
-const financialData = [
-  { month: "Jan", income: 0, expenses: 0 },
-  { month: "Fév", income: 0, expenses: 0 },
-  { month: "Mar", income: 0, expenses: 0 },
-  { month: "Avr", income: 0, expenses: 0 },
-  { month: "Mai", income: 0, expenses: 0 },
-  { month: "Juin", income: 0, expenses: 0 },
-];
+type ReportsClientProps = {
+  data: ReportsData;
+}
 
-const transactions: {id: number, date: string, description: string, type: "Revenu" | "Dépense", amount: number}[] = [];
+export function ReportsClient({ data }: ReportsClientProps) {
+    const { 
+      totalRevenue, 
+      totalExpenses, 
+      netProfit, 
+      profitMargin, 
+      financialData, 
+      transactions 
+    } = data;
 
-export function ReportsClient() {
     return (
         <>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -48,7 +51,7 @@ export function ReportsClient() {
                         <TrendingUp className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">0.00 €</div>
+                        <div className="text-2xl font-bold">{totalRevenue.toLocaleString('fr-BE', { style: 'currency', currency: 'EUR' })}</div>
                         <p className="text-xs text-muted-foreground">Depuis le début de l'année</p>
                     </CardContent>
                 </Card>
@@ -58,7 +61,7 @@ export function ReportsClient() {
                         <TrendingDown className="h-4 w-4 text-red-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">0.00 €</div>
+                        <div className="text-2xl font-bold">{totalExpenses.toLocaleString('fr-BE', { style: 'currency', currency: 'EUR' })}</div>
                         <p className="text-xs text-muted-foreground">Depuis le début de l'année</p>
                     </CardContent>
                 </Card>
@@ -68,7 +71,7 @@ export function ReportsClient() {
                         <Landmark className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">0.00 €</div>
+                        <div className="text-2xl font-bold">{netProfit.toLocaleString('fr-BE', { style: 'currency', currency: 'EUR' })}</div>
                         <p className="text-xs text-muted-foreground">Depuis le début de l'année</p>
                     </CardContent>
                 </Card>
@@ -78,7 +81,7 @@ export function ReportsClient() {
                         <Euro className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">0%</div>
+                        <div className="text-2xl font-bold">{profitMargin.toFixed(1)}%</div>
                         <p className="text-xs text-muted-foreground">Depuis le début de l'année</p>
                     </CardContent>
                 </Card>
@@ -142,7 +145,7 @@ export function ReportsClient() {
                                         <Badge variant={tx.type === 'Revenu' ? 'default' : 'secondary'} className={tx.type === 'Revenu' ? 'bg-green-500/20 text-green-700 border-green-500/20' : 'bg-red-500/20 text-red-700 border-red-500/20'}>{tx.type}</Badge>
                                     </TableCell>
                                     <TableCell className={`text-right font-semibold ${tx.type === 'Revenu' ? 'text-green-600' : 'text-red-600'}`}>
-                                        {tx.type === 'Dépense' ? '-' : ''}{tx.amount.toFixed(2)} €
+                                        {tx.type === 'Dépense' ? '-' : ''}{tx.amount.toLocaleString('fr-BE', { style: 'currency', currency: 'EUR' })}
                                     </TableCell>
                                 </TableRow>
                             )) : (

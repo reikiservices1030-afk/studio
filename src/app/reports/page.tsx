@@ -3,8 +3,10 @@ import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { ReportsClient } from "./reports-client";
+import { getReportsData } from "./actions";
 
-export default function ReportsPage() {
+export default async function ReportsPage() {
+  const reportsData = await getReportsData();
   return (
     <div className="flex flex-col h-full">
       <Header title="Rapports financiers">
@@ -14,7 +16,7 @@ export default function ReportsPage() {
         </Button>
       </Header>
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-        <ReportsClient />
+        <ReportsClient data={reportsData} />
       </div>
     </div>
   );
