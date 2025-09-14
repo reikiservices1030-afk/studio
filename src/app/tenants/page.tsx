@@ -286,28 +286,27 @@ export default function TenantsPage() {
 
   const handleSave = async () => {
     setUploading(true);
-    const { firstName, lastName, email, propertyId, leaseStart, leaseDuration, nationalId, paymentDueDay } = currentTenant;
-    if (!firstName || !lastName || !email || !propertyId || !leaseStart || !leaseDuration || !nationalId || !paymentDueDay) {
-      toast({
-        variant: 'destructive',
-        title: 'Erreur',
-        description: 'Veuillez remplir tous les champs obligatoires.',
-      });
-      setUploading(false);
-      return;
-    }
-
-    let idCardUrl = currentTenant.idCardUrl || '';
-    let idCardPath = currentTenant.idCardPath || '';
-
     try {
+        const { firstName, lastName, email, propertyId, leaseStart, leaseDuration, nationalId, paymentDueDay } = currentTenant;
+        if (!firstName || !lastName || !email || !propertyId || !leaseStart || !leaseDuration || !nationalId || !paymentDueDay) {
+          toast({
+            variant: 'destructive',
+            title: 'Erreur',
+            description: 'Veuillez remplir tous les champs obligatoires.',
+          });
+          return;
+        }
+
+        let idCardUrl = currentTenant.idCardUrl || '';
+        let idCardPath = currentTenant.idCardPath || '';
+
         if (idCardFile) {
             if (isEditing && currentTenant.idCardPath) {
                 const oldImageRef = storageRef(storage, currentTenant.idCardPath);
                 await deleteObject(oldImageRef).catch(err => console.error("Could not delete old image", err));
             }
-            const fileExtension = idCardFile.name.split('.').pop();
-            const newImagePath = `id_cards/${nationalId}.${fileExtension}`;
+            const safeFileName = `${Date.now()}_${idCardFile.name.replace(/\s+/g, '_')}`;
+            const newImagePath = `id_cards/${safeFileName}`;
             const newImageRef = storageRef(storage, newImagePath);
             await uploadBytes(newImageRef, idCardFile);
             idCardUrl = await getDownloadURL(newImageRef);
@@ -317,7 +316,6 @@ export default function TenantsPage() {
         const selectedProperty = properties.find(p => p.id === propertyId);
         if (!selectedProperty) {
             toast({ variant: 'destructive', title: 'Erreur', description: 'Propriété sélectionnée invalide.' });
-            setUploading(false);
             return;
         }
 

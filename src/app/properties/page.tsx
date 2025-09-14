@@ -87,63 +87,62 @@ export default function PropertiesPage() {
 
   const handleSave = async () => {
     setUploading(true);
-    if (!currentProperty.address || !currentProperty.baseRent) {
-      toast({
-        variant: 'destructive',
-        title: 'Erreur',
-        description: 'Veuillez remplir au moins l\'adresse et le loyer de base.',
-      });
-      setUploading(false);
-      return;
-    }
-
-    let imageUrl = currentProperty.imageUrl || '';
-    let imagePath = currentProperty.imagePath || '';
-
     try {
-      if (imageFile) {
-        if (isEditing && currentProperty.imagePath) {
-            const oldImageRef = storageRef(storage, currentProperty.imagePath);
-            await deleteObject(oldImageRef).catch(err => console.error("Could not delete old image, may not exist", err));
+        if (!currentProperty.address || !currentProperty.baseRent) {
+          toast({
+            variant: 'destructive',
+            title: 'Erreur',
+            description: 'Veuillez remplir au moins l\'adresse et le loyer de base.',
+          });
+          return;
         }
 
-        const newImagePath = `properties/${Date.now()}_${imageFile.name}`;
-        const newImageRef = storageRef(storage, newImagePath);
-        await uploadBytes(newImageRef, imageFile);
-        imageUrl = await getDownloadURL(newImageRef);
-        imagePath = newImagePath;
-      }
+        let imageUrl = currentProperty.imageUrl || '';
+        let imagePath = currentProperty.imagePath || '';
 
-      const propertyData = {
-        address: currentProperty.address,
-        baseRent: Number(currentProperty.baseRent),
-        chargesWater: Number(currentProperty.chargesWater || 0),
-        chargesElectricity: Number(currentProperty.chargesElectricity || 0),
-        chargesGas: Number(currentProperty.chargesGas || 0),
-        chargesCommon: Number(currentProperty.chargesCommon || 0),
-        imageUrl,
-        imagePath,
-      };
+        if (imageFile) {
+            if (isEditing && currentProperty.imagePath) {
+                const oldImageRef = storageRef(storage, currentProperty.imagePath);
+                await deleteObject(oldImageRef).catch(err => console.error("Could not delete old image, may not exist", err));
+            }
+            const safeFileName = `${Date.now()}_${imageFile.name.replace(/\s+/g, '_')}`;
+            const newImagePath = `properties/${safeFileName}`;
+            const newImageRef = storageRef(storage, newImagePath);
+            await uploadBytes(newImageRef, imageFile);
+            imageUrl = await getDownloadURL(newImageRef);
+            imagePath = newImagePath;
+        }
 
-      if (isEditing && currentProperty.id) {
-        const propertyRef = dbRef(db, `properties/${currentProperty.id}`);
-        await update(propertyRef, propertyData);
-        toast({ title: 'Succès', description: 'Propriété mise à jour.' });
-      } else {
-        const propertiesRef = dbRef(db, 'properties');
-        await push(propertiesRef, propertyData);
-        toast({ title: 'Succès', description: 'Propriété ajoutée.' });
-      }
-      resetDialog();
+        const propertyData = {
+            address: currentProperty.address,
+            baseRent: Number(currentProperty.baseRent),
+            chargesWater: Number(currentProperty.chargesWater || 0),
+            chargesElectricity: Number(currentProperty.chargesElectricity || 0),
+            chargesGas: Number(currentProperty.chargesGas || 0),
+            chargesCommon: Number(currentProperty.chargesCommon || 0),
+            imageUrl,
+            imagePath,
+        };
+
+        if (isEditing && currentProperty.id) {
+            const propertyRef = dbRef(db, `properties/${currentProperty.id}`);
+            await update(propertyRef, propertyData);
+            toast({ title: 'Succès', description: 'Propriété mise à jour.' });
+        } else {
+            const propertiesRef = dbRef(db, 'properties');
+            await push(propertiesRef, propertyData);
+            toast({ title: 'Succès', description: 'Propriété ajoutée.' });
+        }
+        resetDialog();
     } catch (error) {
-      console.error('Error saving property:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Erreur',
-        description: "Impossible d'enregistrer la propriété.",
-      });
+        console.error('Error saving property:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Erreur',
+            description: "Impossible d'enregistrer la propriété.",
+        });
     } finally {
-      setUploading(false);
+        setUploading(false);
     }
   };
 
