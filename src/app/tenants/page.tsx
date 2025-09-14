@@ -285,6 +285,7 @@ export default function TenantsPage() {
   };
 
   const handleSave = async () => {
+    setUploading(true);
     const { firstName, lastName, email, propertyId, leaseStart, leaseDuration, nationalId, paymentDueDay } = currentTenant;
     if (!firstName || !lastName || !email || !propertyId || !leaseStart || !leaseDuration || !nationalId || !paymentDueDay) {
       toast({
@@ -292,9 +293,9 @@ export default function TenantsPage() {
         title: 'Erreur',
         description: 'Veuillez remplir tous les champs obligatoires.',
       });
+      setUploading(false);
       return;
     }
-    setUploading(true);
 
     let idCardUrl = currentTenant.idCardUrl || '';
     let idCardPath = currentTenant.idCardPath || '';

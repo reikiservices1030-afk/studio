@@ -86,15 +86,16 @@ export default function PropertiesPage() {
   };
 
   const handleSave = async () => {
+    setUploading(true);
     if (!currentProperty.address || !currentProperty.baseRent) {
       toast({
         variant: 'destructive',
         title: 'Erreur',
         description: 'Veuillez remplir au moins l\'adresse et le loyer de base.',
       });
+      setUploading(false);
       return;
     }
-    setUploading(true);
 
     let imageUrl = currentProperty.imageUrl || '';
     let imagePath = currentProperty.imagePath || '';
