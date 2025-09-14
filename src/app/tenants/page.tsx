@@ -462,7 +462,7 @@ export default function TenantsPage() {
 
   const generateLease = async (tenant: Tenant) => {
     const property = properties.find(p => p.id === tenant.propertyId);
-    if (!property || !ownerInfo) {
+    if (!property || !ownerInfo || !ownerInfo.name || !ownerInfo.address) {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Informations sur la propriété ou le propriétaire manquantes.' });
       return;
     }
