@@ -323,10 +323,15 @@ export default function PaymentsPage() {
       toast({ variant: "destructive", title: "Erreur", description: "Email du locataire manquant."});
       return;
     }
-    const subject = `Reçu de paiement pour ${group.period}`;
-    const body = getReceiptText(group);
-    const mailtoUrl = `mailto:${tenant.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = mailtoUrl;
+    const receiptText = getReceiptText(group);
+    navigator.clipboard.writeText(receiptText)
+      .then(() => {
+        toast({ title: "Copié", description: "Le texte du reçu a été copié dans le presse-papiers."});
+      })
+      .catch(err => {
+        console.error('Failed to copy text: ', err);
+        toast({ variant: "destructive", title: "Erreur", description: "Impossible de copier le texte."});
+      });
   };
 
   const getReceiptHTML = (group: GroupedPayment) => {
@@ -534,7 +539,7 @@ export default function PaymentsPage() {
                           </DropdownMenuItem>
                            <DropdownMenuItem onClick={() => handleEmailReceipt(group)}>
                             <Mail className="mr-2 h-4 w-4" />
-                            Envoyer par Email
+                            Copier pour Email
                           </DropdownMenuItem>
                           <DropdownMenuLabel>Versements individuels</DropdownMenuLabel>
                            {group.payments.map(p => (
