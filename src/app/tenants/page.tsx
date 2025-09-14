@@ -102,6 +102,7 @@ export default function TenantsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [currentTenant, setCurrentTenant] = useState<Partial<Tenant>>({});
@@ -284,7 +285,6 @@ export default function TenantsPage() {
   };
 
   const handleSave = async () => {
-    
     try {
         const { firstName, lastName, email, propertyId, leaseStart, leaseDuration, nationalId, paymentDueDay } = currentTenant;
         if (!firstName || !lastName || !email || !propertyId || !leaseStart || !leaseDuration || !nationalId || !paymentDueDay) {
@@ -293,7 +293,7 @@ export default function TenantsPage() {
             title: 'Erreur',
             description: 'Veuillez remplir tous les champs obligatoires.',
           });
-          
+          setUploading(false); // Stop spinner on validation fail
           return;
         }
         setUploading(true);
@@ -316,7 +316,7 @@ export default function TenantsPage() {
         const selectedProperty = properties.find(p => p.id === propertyId);
         if (!selectedProperty) {
             toast({ variant: 'destructive', title: 'Erreur', description: 'Propriété sélectionnée invalide.' });
-            
+            setUploading(false); // Stop spinner
             return;
         }
 
@@ -463,7 +463,7 @@ export default function TenantsPage() {
   const generateLease = async (tenant: Tenant) => {
     const property = properties.find(p => p.id === tenant.propertyId);
     if (!property || !ownerInfo || !ownerInfo.name?.trim() || !ownerInfo.address?.trim()) {
-        toast({ variant: 'destructive', title: 'Erreur', description: 'Informations sur la propriété ou le propriétaire manquantes.' });
+        toast({ variant: 'destructive', title: 'Erreur', description: 'Informations sur la propriété ou le propriétaire manquantes. Veuillez les compléter dans les paramètres.' });
         return;
     }
 
@@ -1010,5 +1010,3 @@ export default function TenantsPage() {
     </div>
   );
 }
-
-    
