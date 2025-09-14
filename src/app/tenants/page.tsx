@@ -103,7 +103,6 @@ export default function TenantsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [currentTenant, setCurrentTenant] = useState<Partial<Tenant>>({});
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
@@ -285,7 +284,7 @@ export default function TenantsPage() {
   };
 
   const handleSave = async () => {
-    setUploading(true);
+    
     try {
         const { firstName, lastName, email, propertyId, leaseStart, leaseDuration, nationalId, paymentDueDay } = currentTenant;
         if (!firstName || !lastName || !email || !propertyId || !leaseStart || !leaseDuration || !nationalId || !paymentDueDay) {
@@ -294,9 +293,10 @@ export default function TenantsPage() {
             title: 'Erreur',
             description: 'Veuillez remplir tous les champs obligatoires.',
           });
+          
           return;
         }
-
+        setUploading(true);
         let idCardUrl = currentTenant.idCardUrl || '';
         let idCardPath = currentTenant.idCardPath || '';
 
@@ -305,7 +305,7 @@ export default function TenantsPage() {
                 const oldImageRef = storageRef(storage, currentTenant.idCardPath);
                 await deleteObject(oldImageRef).catch(err => console.error("Could not delete old image", err));
             }
-            const safeFileName = `${Date.now()}_${idCardFile.name.replace(/\s+/g, '_')}`;
+            const safeFileName = `${Date.now()}_${idCardFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
             const newImagePath = `id_cards/${safeFileName}`;
             const newImageRef = storageRef(storage, newImagePath);
             await uploadBytes(newImageRef, idCardFile);
@@ -316,6 +316,7 @@ export default function TenantsPage() {
         const selectedProperty = properties.find(p => p.id === propertyId);
         if (!selectedProperty) {
             toast({ variant: 'destructive', title: 'Erreur', description: 'Propriété sélectionnée invalide.' });
+            
             return;
         }
 
@@ -461,9 +462,9 @@ export default function TenantsPage() {
 
   const generateLease = async (tenant: Tenant) => {
     const property = properties.find(p => p.id === tenant.propertyId);
-    if (!property || !ownerInfo || !ownerInfo.name || !ownerInfo.address) {
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Informations sur la propriété ou le propriétaire manquantes.' });
-      return;
+    if (!property || !ownerInfo || !ownerInfo.name?.trim() || !ownerInfo.address?.trim()) {
+        toast({ variant: 'destructive', title: 'Erreur', description: 'Informations sur la propriété ou le propriétaire manquantes.' });
+        return;
     }
 
     const leaseEndDate = new Date(tenant.leaseStart);
@@ -1009,3 +1010,5 @@ export default function TenantsPage() {
     </div>
   );
 }
+
+    
