@@ -523,7 +523,6 @@ export default function TenantsPage() {
                 <ul>
                   <li><strong>LE PRENEUR :</strong></li>
                   <li>${tenant.firstName} ${tenant.lastName}</li>
-                  <li>Né(e) le: [Date de naissance]</li>
                   <li>Nationalité : ${tenant.nationality}</li>
                   <li>N° National : ${tenant.nationalId}</li>
                 </ul>
@@ -617,7 +616,7 @@ export default function TenantsPage() {
     
     const tenantUnpaidRents = unpaidRents.filter(rent => rent.tenantId === tenant.id);
     const totalArrears = tenantUnpaidRents.reduce((acc, rent) => acc + (rent.totalDue - rent.totalPaid), 0);
-    const arrearsDetails = tenantUnpaidRents.map(rent => ` - ${rent.period}: ${(rent.totalDue - rent.totalPaid).toFixed(2)} €`).join('\n');
+    const arrearsDetails = tenantUnpaidRents.map(rent => ` - ${rent.period}: ${(rent.totalDue - rent.totalPaid).toFixed(2)} €`).join('\\n');
 
     if (tenantUnpaidRents.length < 2) {
       toast({ variant: 'destructive', title: 'Action non requise', description: 'Une mise en demeure est généralement envoyée après 2 mois de loyers impayés.' });
