@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle, Printer, Loader2, Mail, Edit } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Printer, Loader2, Mail, Edit, Download } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -317,23 +317,6 @@ export default function PaymentsPage() {
     window.open(whatsappUrl, '_blank');
   };
   
-  const handleEmailReceipt = (group: GroupedPayment) => {
-    const tenant = tenants.find(t => t.id === group.tenantId);
-    if (!tenant?.email) {
-      toast({ variant: "destructive", title: "Erreur", description: "Email du locataire manquant."});
-      return;
-    }
-    const receiptText = getReceiptText(group);
-    navigator.clipboard.writeText(receiptText)
-      .then(() => {
-        toast({ title: "Copié", description: "Le texte du reçu a été copié dans le presse-papiers."});
-      })
-      .catch(err => {
-        console.error('Failed to copy text: ', err);
-        toast({ variant: "destructive", title: "Erreur", description: "Impossible de copier le texte."});
-      });
-  };
-
   const getReceiptHTML = (group: GroupedPayment) => {
     const balance = (group.totalDue || 0) - (group.totalPaid || 0);
     const balanceText = balance > 0 ? `<tr><th style="color: #e53e3e;">Solde restant:</th><td style="color: #e53e3e; font-weight: bold;">${balance.toFixed(2)} €</td></tr>` : '<tr><td colspan="2" style="text-align:center; font-weight:bold; color: #38a169;">Paiement complet</td></tr>';
@@ -363,7 +346,7 @@ export default function PaymentsPage() {
           </style>
         </head>
         <body>
-          <div class="container">
+          <div class="container" id="receipt-to-print">
             <div class="header">
               <h1>QUITTANCE DE ${type.toUpperCase()}</h1>
               <p>Période: ${group.period}</p>
@@ -397,6 +380,49 @@ export default function PaymentsPage() {
       </html>
     `;
   }
+
+  const handleDownloadReceipt = async (group: GroupedPayment) => {
+    const receiptHtml = getReceiptHTML(group);
+    const printContainer = document.createElement('div');
+    printContainer.innerHTML = receiptHtml;
+    document.body.appendChild(printContainer);
+    
+    try {
+      toast({ title: "Génération du PDF...", description: "Veuillez patienter." });
+      const elementToPrint = printContainer.querySelector('#receipt-to-print');
+      if (!elementToPrint) throw new Error("Receipt element not found");
+
+      const canvas = await html2canvas(elementToPrint as HTMLElement, { scale: 2 });
+      const imgData = canvas.toDataURL('image/png');
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      let heightLeft = pdfHeight;
+      let position = 0;
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
+      
+      while (heightLeft > 0) {
+          position = heightLeft - pdfHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+          heightLeft -= pageHeight;
+      }
+      
+      pdf.save(`Quittance-${group.tenantLastName}-${group.period}.pdf`);
+      toast({ title: "Succès", description: "Reçu téléchargé en PDF." });
+
+    } catch (error) {
+        console.error("Error generating PDF:", error);
+        toast({ variant: "destructive", title: "Erreur", description: "Impossible de générer le PDF." });
+    } finally {
+        document.body.removeChild(printContainer);
+    }
+  };
+
 
   const handlePrintReceipt = async (group: GroupedPayment) => {
     const receiptHtml = getReceiptHTML(group);
@@ -537,9 +563,9 @@ export default function PaymentsPage() {
                             <WhatsappIcon />
                             <span className="ml-2">Envoyer par WhatsApp</span>
                           </DropdownMenuItem>
-                           <DropdownMenuItem onClick={() => handleEmailReceipt(group)}>
-                            <Mail className="mr-2 h-4 w-4" />
-                            Copier pour Email
+                           <DropdownMenuItem onClick={() => handleDownloadReceipt(group)}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Télécharger PDF
                           </DropdownMenuItem>
                           <DropdownMenuLabel>Versements individuels</DropdownMenuLabel>
                            {group.payments.map(p => (
