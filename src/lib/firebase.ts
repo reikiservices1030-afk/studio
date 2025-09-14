@@ -9,7 +9,7 @@ const firebaseConfig = {
   authDomain: "rentify-n8ge3.firebaseapp.com",
   databaseURL: "https://rentify-n8ge3-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "rentify-n8ge3",
-  storageBucket: "rentify-n8ge3.firebasestorage.app",
+  storageBucket: "gs://rentify-n8ge3.appspot.com",
   messagingSenderId: "1025540698370",
   appId: "1:1025540698370:web:3b1c49da2b4dd1fe87d21b"
 };
