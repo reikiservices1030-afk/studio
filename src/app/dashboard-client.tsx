@@ -129,8 +129,8 @@ export function DashboardClient({ data }: DashboardClientProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="h-[300px] w-full p-0">
-            <ChartContainer config={{}} className="h-full w-full">
-              <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%">
+              <ChartContainer config={{}} className="h-full w-full">
                 <RechartsBarChart data={monthlyRevenue}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis
@@ -154,13 +154,13 @@ export function DashboardClient({ data }: DashboardClientProps) {
                     name="Revenu"
                   />
                 </RechartsBarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+              </ChartContainer>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle className="font-headline">Activité récente</CardTitle>
+            <CardTitle className="font-headline">Activité recente</CardTitle>
             <CardDescription>
               Derniers paiements de loyer enregistrés.
             </CardDescription>

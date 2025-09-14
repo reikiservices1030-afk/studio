@@ -86,17 +86,17 @@ export default function PropertiesPage() {
   };
 
   const handleSave = async () => {
+    if (!currentProperty.address || !currentProperty.baseRent) {
+      toast({
+        variant: 'destructive',
+        title: 'Erreur',
+        description: 'Veuillez remplir au moins l\'adresse et le loyer de base.',
+      });
+      return;
+    }
+
     setUploading(true);
     try {
-        if (!currentProperty.address || !currentProperty.baseRent) {
-          toast({
-            variant: 'destructive',
-            title: 'Erreur',
-            description: 'Veuillez remplir au moins l\'adresse et le loyer de base.',
-          });
-          return;
-        }
-
         let imageUrl = currentProperty.imageUrl || '';
         let imagePath = currentProperty.imagePath || '';
 
@@ -220,6 +220,7 @@ export default function PropertiesPage() {
                         src={prop.imageUrl || 'https://placehold.co/600x400.png'}
                         alt={prop.address}
                         fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         className="object-cover"
                         data-ai-hint="apartment building"
                       />
