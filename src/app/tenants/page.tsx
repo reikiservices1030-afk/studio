@@ -285,6 +285,7 @@ export default function TenantsPage() {
   };
 
   const handleSave = async () => {
+    setUploading(true);
     try {
         const { firstName, lastName, email, propertyId, leaseStart, leaseDuration, nationalId, paymentDueDay } = currentTenant;
         if (!firstName || !lastName || !email || !propertyId || !leaseStart || !leaseDuration || !nationalId || !paymentDueDay) {
@@ -293,10 +294,10 @@ export default function TenantsPage() {
             title: 'Erreur',
             description: 'Veuillez remplir tous les champs obligatoires.',
           });
-          setUploading(false); // Stop spinner on validation fail
+          setUploading(false);
           return;
         }
-        setUploading(true);
+        
         let idCardUrl = currentTenant.idCardUrl || '';
         let idCardPath = currentTenant.idCardPath || '';
 
@@ -305,8 +306,7 @@ export default function TenantsPage() {
                 const oldImageRef = storageRef(storage, currentTenant.idCardPath);
                 await deleteObject(oldImageRef).catch(err => console.error("Could not delete old image", err));
             }
-            const safeFileName = `${Date.now()}_${idCardFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-            const newImagePath = `id_cards/${safeFileName}`;
+            const newImagePath = `id_cards/${Date.now()}_${idCardFile.name}`;
             const newImageRef = storageRef(storage, newImagePath);
             await uploadBytes(newImageRef, idCardFile);
             idCardUrl = await getDownloadURL(newImageRef);
@@ -316,7 +316,7 @@ export default function TenantsPage() {
         const selectedProperty = properties.find(p => p.id === propertyId);
         if (!selectedProperty) {
             toast({ variant: 'destructive', title: 'Erreur', description: 'Propriété sélectionnée invalide.' });
-            setUploading(false); // Stop spinner
+            setUploading(false);
             return;
         }
 
@@ -473,7 +473,7 @@ export default function TenantsPage() {
 
     const totalRent = property.baseRent + (property.chargesWater || 0) + (property.chargesElectricity || 0) + (property.chargesGas || 0) + (property.chargesCommon || 0);
     const chargesBreakdown = `
-        <ul>
+        <ul style="list-style: none; padding-left: 0; margin-top: 5px;">
             <li>Loyer de base: ${property.baseRent.toFixed(2)} €</li>
             ${property.chargesWater ? `<li>Provision eau: ${property.chargesWater.toFixed(2)} €</li>` : ''}
             ${property.chargesElectricity ? `<li>Provision électricité: ${property.chargesElectricity.toFixed(2)} €</li>` : ''}
@@ -487,19 +487,24 @@ export default function TenantsPage() {
         <head>
           <title>Contrat de Bail - ${tenant.lastName}</title>
           <style>
-            body { font-family: 'Times New Roman', serif; margin: 0; padding: 2rem; line-height: 1.6; font-size: 12pt; }
-            .container { max-width: 800px; margin: auto; background: white; padding: 2rem;}
-            h1, h2, h3 { text-align: center; }
-            .section { margin-top: 2rem; text-align: justify; }
-            .parties, .signatures { display: flex; justify-content: space-between; margin-top: 2rem; }
-            .party, .signature { width: 48%; }
-            ul { list-style: none; padding-left: 0; }
-            li { margin-bottom: 0.5rem; }
+            body { font-family: 'Times New Roman', serif; line-height: 1.5; font-size: 11pt; color: #333; }
+            .page { width: 210mm; min-height: 297mm; padding: 20mm; margin: 0 auto; box-sizing: border-box; background: white; page-break-after: always; }
+            h1, h2, h3 { text-align: center; margin: 10px 0; }
+            h1 { font-size: 16pt; }
+            h2 { font-size: 12pt; text-decoration: underline; }
+            h3 { font-size: 12pt; text-align: center; }
+            p { margin: 10px 0; text-align: justify; }
+            .section { margin-top: 15px; }
+            .parties { display: flex; justify-content: space-between; margin-top: 20px; }
+            .party { width: 48%; }
+            .party ul { list-style: none; padding-left: 0; }
+            .signatures { margin-top: 40px; display: flex; justify-content: space-around; }
+            .signature { width: 45%; text-align: center; }
             strong { font-weight: bold; }
           </style>
         </head>
         <body>
-          <div class="container">
+          <div class="page">
             <h1>CONTRAT DE BAIL DE RÉSIDENCE PRINCIPALE</h1>
             <h3>(Loi du 20 février 1991 - Code du Logement)</h3>
 
@@ -549,19 +554,29 @@ export default function TenantsPage() {
               <h2>Article 3 : Garantie locative</h2>
               <p>Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer, soit <strong>${(tenant.depositAmount || 0).toFixed(2)} €</strong>. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.</p>
             </div>
+            
+             <div class="section">
+                <h2>Article 4 : État des lieux</h2>
+                <p>Un état des lieux d'entrée détaillé sera dressé contradictoirement et à frais communs par un expert désigné par les parties avant l'entrée en jouissance du Preneur. Il sera annexé au présent contrat et enregistré avec celui-ci.</p>
+            </div>
 
-            <div class="section signatures">
+            <div class="section">
+                <h2>Article 5 : Obligations du preneur</h2>
+                <p>Le Preneur s'engage à jouir du bien loué en bon père de famille, à l'entretenir et à le restituer en fin de bail dans l'état où il l'a reçu, excepté l'usure normale et la vétusté. Il devra contracter une assurance couvrant sa responsabilité locative.</p>
+            </div>
+            
+            <div class="signatures">
               <div class="signature">
                   <p>Fait à Bruxelles, le ${new Date().toLocaleDateString('fr-BE')}, en deux exemplaires, chaque partie reconnaissant avoir reçu le sien.</p>
                   <br/><br/>
                   <strong>LE BAILLEUR</strong>
-                  <br/><br/>
+                  <br/><br/><br/><br/>
                   (Signature)
               </div>
               <div class="signature">
-                  <br/><br/><br/><br/><br/><br/>
+                   <br/><br/><br/><br/><br/><br/>
                   <strong>LE PRENEUR</strong>
-                  <br/><br/>
+                  <br/><br/><br/><br/>
                   (Signature)
               </div>
             </div>
@@ -570,29 +585,26 @@ export default function TenantsPage() {
       </html>
     `;
     
-    const printContainer = document.createElement('div');
-    printContainer.innerHTML = leaseContent;
-    document.body.appendChild(printContainer);
-    
     try {
       toast({ title: "Génération du PDF...", description: "Veuillez patienter." });
-      const canvas = await html2canvas(printContainer.querySelector('.container') as HTMLElement);
-      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       
-      const fileName = `Bail-${tenant.lastName}-${tenant.leaseStart}.pdf`;
-      pdf.save(fileName);
+      await pdf.html(leaseContent, {
+          callback: function (doc) {
+              const fileName = `Bail-${tenant.lastName}-${tenant.leaseStart}.pdf`;
+              doc.save(fileName);
+          },
+          margin: [15, 15, 15, 15],
+          autoPaging: 'text',
+          width: 180, // width of content within PDF
+          windowWidth: 800 // width of the htmlWindow
+      });
 
       toast({ title: "Succès", description: "Bail téléchargé." });
 
     } catch (error) {
-      console.error("Error saving or printing lease:", error);
+      console.error("Error generating lease PDF:", error);
       toast({ variant: "destructive", title: "Erreur", description: "Impossible de générer le bail." });
-    } finally {
-        document.body.removeChild(printContainer);
     }
   };
 
