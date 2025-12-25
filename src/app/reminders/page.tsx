@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -237,7 +236,7 @@ export default function RemindersPage() {
             <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
             <Button onClick={handleAddReminder} disabled={saving}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Programmer
+                {saving ? 'Programmation...' : 'Programmer'}
             </Button>
           </DialogFooter>
         </DialogContent>

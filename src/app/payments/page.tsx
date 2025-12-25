@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -75,6 +74,7 @@ export default function PaymentsPage() {
   const [saving, setSaving] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [currentPayment, setCurrentPayment] = useState<Partial<Payment>>({
     tenantId: "",
     date: new Date().toISOString().split('T')[0],
@@ -294,7 +294,7 @@ export default function PaymentsPage() {
     setIsDialogOpen(true);
   }
 
-  const getReceiptText = (group: GroupedPayment) => {
+  const handleCopyReceipt = (group: GroupedPayment) => {
     const balance = (group.totalDue || 0) - (group.totalPaid || 0);
     let balanceText = `Solde restant pour ${group.period}: ${balance.toFixed(2)} €`;
     if (balance <= 0) {
@@ -303,16 +303,29 @@ export default function PaymentsPage() {
 
     let paymentsDetails = group.payments.map(p => `- ${new Date(p.date).toLocaleDateString('fr-BE')}: ${(p.amount || 0).toFixed(2)} €`).join('\n');
 
-    return `Bonjour ${group.tenantFirstName} ${group.tenantLastName},\n\nVoici votre reçu pour le paiement de ${(group.type || '').toLowerCase()} pour ${group.period}.\n\n- Montant total dû : ${(group.totalDue || 0).toFixed(2)} €\n- Montant total payé : ${(group.totalPaid || 0).toFixed(2)} €\n- Propriété : ${group.property}\n\nDétails des paiements:\n${paymentsDetails}\n\n${balanceText}\n\nCordialement,\n${ownerInfo?.name || ''}`;
+    const receiptText = `Bonjour ${group.tenantFirstName} ${group.tenantLastName},\n\nVoici votre reçu pour le paiement de ${(group.type || '').toLowerCase()} pour ${group.period}.\n\n- Montant total dû : ${(group.totalDue || 0).toFixed(2)} €\n- Montant total payé : ${(group.totalPaid || 0).toFixed(2)} €\n- Propriété : ${group.property}\n\nDétails des paiements:\n${paymentsDetails}\n\n${balanceText}\n\nCordialement,\n${ownerInfo?.name || ''}`;
+
+    navigator.clipboard.writeText(receiptText).then(() => {
+        toast({ title: "Copié !", description: "Le texte de la quittance a été copié dans le presse-papiers." });
+    }, (err) => {
+        toast({ variant: "destructive", title: "Erreur", description: "Impossible de copier le texte." });
+    });
   }
 
-  const handleSendReceipt = (group: GroupedPayment) => {
+  const handleSendWhatsApp = (group: GroupedPayment) => {
     const tenant = tenants.find(t => t.id === group.tenantId);
     if (!tenant?.phone) {
       toast({ variant: "destructive", title: "Erreur", description: "Numéro de téléphone du locataire manquant."});
       return;
     }
-    const receiptText = getReceiptText(group);
+     const balance = (group.totalDue || 0) - (group.totalPaid || 0);
+    let balanceText = `Solde restant pour ${group.period}: ${balance.toFixed(2)} €`;
+    if (balance <= 0) {
+      balanceText = "Ce paiement solde la période.";
+    }
+    let paymentsDetails = group.payments.map(p => `- ${new Date(p.date).toLocaleDateString('fr-BE')}: ${(p.amount || 0).toFixed(2)} €`).join('\n');
+    const receiptText = `Bonjour ${group.tenantFirstName} ${group.tenantLastName},\n\nVoici votre reçu pour le paiement de ${(group.type || '').toLowerCase()} pour ${group.period}.\n\n- Montant total dû : ${(group.totalDue || 0).toFixed(2)} €\n- Montant total payé : ${(group.totalPaid || 0).toFixed(2)} €\n- Propriété : ${group.property}\n\nDétails des paiements:\n${paymentsDetails}\n\n${balanceText}\n\nCordialement,\n${ownerInfo?.name || ''}`;
+    
     const whatsappUrl = `https://wa.me/${tenant.phone.replace(/\D/g, '')}?text=${encodeURIComponent(receiptText)}`;
     window.open(whatsappUrl, '_blank');
   };
@@ -382,6 +395,7 @@ export default function PaymentsPage() {
   }
 
   const handleDownloadReceipt = async (group: GroupedPayment) => {
+    setIsDownloading(true);
     const receiptHtml = getReceiptHTML(group);
     const printContainer = document.createElement('div');
     printContainer.innerHTML = receiptHtml;
@@ -420,6 +434,7 @@ export default function PaymentsPage() {
         toast({ variant: "destructive", title: "Erreur", description: "Impossible de générer le PDF." });
     } finally {
         document.body.removeChild(printContainer);
+        setIsDownloading(false);
     }
   };
 
@@ -559,12 +574,16 @@ export default function PaymentsPage() {
                             <Printer className="mr-2 h-4 w-4" />
                             Imprimer le reçu
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleSendReceipt(group)}>
+                          <DropdownMenuItem onClick={() => handleSendWhatsApp(group)}>
                             <WhatsappIcon />
                             <span className="ml-2">Envoyer par WhatsApp</span>
                           </DropdownMenuItem>
-                           <DropdownMenuItem onClick={() => handleDownloadReceipt(group)}>
-                            <Download className="mr-2 h-4 w-4" />
+                          <DropdownMenuItem onClick={() => handleCopyReceipt(group)}>
+                            <Mail className="mr-2 h-4 w-4" />
+                            Copier pour Email
+                          </DropdownMenuItem>
+                           <DropdownMenuItem onClick={() => handleDownloadReceipt(group)} disabled={isDownloading}>
+                            {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                             Télécharger PDF
                           </DropdownMenuItem>
                           <DropdownMenuLabel>Versements individuels</DropdownMenuLabel>

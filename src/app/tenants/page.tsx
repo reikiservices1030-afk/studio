@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -69,7 +68,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import type { Tenant, Property, OwnerInfo, Maintenance, Payment, GroupedPayment } from '@/types';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import 'jspdf-autotable';
 import { Separator } from '@/components/ui/separator';
 
 
@@ -104,6 +103,7 @@ export default function TenantsPage() {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [currentTenant, setCurrentTenant] = useState<Partial<Tenant>>({});
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
@@ -285,19 +285,18 @@ export default function TenantsPage() {
   };
 
   const handleSave = async () => {
+    const { firstName, lastName, email, propertyId, leaseStart, leaseDuration, nationalId, paymentDueDay } = currentTenant;
+    if (!firstName || !lastName || !email || !propertyId || !leaseStart || !leaseDuration || !nationalId || !paymentDueDay) {
+      toast({
+        variant: 'destructive',
+        title: 'Erreur',
+        description: 'Veuillez remplir tous les champs obligatoires.',
+      });
+      return;
+    }
+    
     setUploading(true);
     try {
-        const { firstName, lastName, email, propertyId, leaseStart, leaseDuration, nationalId, paymentDueDay } = currentTenant;
-        if (!firstName || !lastName || !email || !propertyId || !leaseStart || !leaseDuration || !nationalId || !paymentDueDay) {
-          toast({
-            variant: 'destructive',
-            title: 'Erreur',
-            description: 'Veuillez remplir tous les champs obligatoires.',
-          });
-          setUploading(false);
-          return;
-        }
-        
         let idCardUrl = currentTenant.idCardUrl || '';
         let idCardPath = currentTenant.idCardPath || '';
 
@@ -415,6 +414,7 @@ export default function TenantsPage() {
   
   const handleDepositSave = async () => {
     if (!currentTenant.id || !currentTenant.depositStatus) return;
+    setUploading(true);
     try {
         const updates: any = {};
         updates[`tenants/${currentTenant.id}/depositStatus`] = currentTenant.depositStatus;
@@ -439,6 +439,8 @@ export default function TenantsPage() {
     } catch(error) {
         console.error('Error updating deposit status:', error);
         toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de mettre à jour le statut.' });
+    } finally {
+        setUploading(false);
     }
   }
 
@@ -461,231 +463,214 @@ export default function TenantsPage() {
   };
 
   const generateLease = async (tenant: Tenant) => {
+    setIsGenerating(true);
     const property = properties.find(p => p.id === tenant.propertyId);
     if (!property || !ownerInfo || !ownerInfo.name?.trim() || !ownerInfo.address?.trim()) {
         toast({ variant: 'destructive', title: 'Erreur', description: 'Informations sur la propriété ou le propriétaire manquantes. Veuillez les compléter dans les paramètres.' });
+        setIsGenerating(false);
         return;
     }
 
-    const leaseEndDate = new Date(tenant.leaseStart);
-    leaseEndDate.setFullYear(leaseEndDate.getFullYear() + Math.floor((tenant.leaseDuration || 0) / 12));
-    leaseEndDate.setMonth(leaseEndDate.getMonth() + ((tenant.leaseDuration || 0) % 12));
-
-    const totalRent = property.baseRent + (property.chargesWater || 0) + (property.chargesElectricity || 0) + (property.chargesGas || 0) + (property.chargesCommon || 0);
-    const chargesBreakdown = `
-        <ul style="list-style: none; padding-left: 0; margin-top: 5px;">
-            <li>Loyer de base: ${property.baseRent.toFixed(2)} €</li>
-            ${property.chargesWater ? `<li>Provision eau: ${property.chargesWater.toFixed(2)} €</li>` : ''}
-            ${property.chargesElectricity ? `<li>Provision électricité: ${property.chargesElectricity.toFixed(2)} €</li>` : ''}
-            ${property.chargesGas ? `<li>Provision gaz: ${property.chargesGas.toFixed(2)} €</li>` : ''}
-            ${property.chargesCommon ? `<li>Provision charges communes: ${property.chargesCommon.toFixed(2)} €</li>` : ''}
-        </ul>
-    `;
-
-    const leaseContent = `
-      <html>
-        <head>
-          <title>Contrat de Bail - ${tenant.lastName}</title>
-          <style>
-            body { font-family: 'Times New Roman', serif; line-height: 1.5; font-size: 11pt; color: #333; }
-            .page { width: 210mm; min-height: 297mm; padding: 20mm; margin: 0 auto; box-sizing: border-box; background: white; page-break-after: always; }
-            h1, h2, h3 { text-align: center; margin: 10px 0; }
-            h1 { font-size: 16pt; }
-            h2 { font-size: 12pt; text-decoration: underline; }
-            h3 { font-size: 12pt; text-align: center; }
-            p { margin: 10px 0; text-align: justify; }
-            .section { margin-top: 15px; }
-            .parties { display: flex; justify-content: space-between; margin-top: 20px; }
-            .party { width: 48%; }
-            .party ul { list-style: none; padding-left: 0; }
-            .signatures { margin-top: 40px; display: flex; justify-content: space-around; }
-            .signature { width: 45%; text-align: center; }
-            strong { font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          <div class="page">
-            <h1>CONTRAT DE BAIL DE RÉSIDENCE PRINCIPALE</h1>
-            <h3>(Loi du 20 février 1991 - Code du Logement)</h3>
-
-            <div class="section parties">
-              <div class="party">
-                <h2>ENTRE :</h2>
-                <ul>
-                  <li><strong>LE BAILLEUR :</strong></li>
-                  <li>${ownerInfo.name}</li>
-                  <li>${ownerInfo.address}</li>
-                  ${ownerInfo.companyNumber ? `<li>BCE : ${ownerInfo.companyNumber}</li>` : ''}
-                </ul>
-              </div>
-              <div class="party">
-                <h2>ET :</h2>
-                <ul>
-                  <li><strong>LE PRENEUR :</strong></li>
-                  <li>${tenant.firstName} ${tenant.lastName}</li>
-                  <li>Nationalité : ${tenant.nationality}</li>
-                  <li>N° National : ${tenant.nationalId}</li>
-                </ul>
-              </div>
-            </div>
-            
-            <div class="section">
-              <h2>IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :</h2>
-              <p>Le Bailleur loue au Preneur, qui accepte, le bien immobilier suivant :</p>
-              <p><strong>Désignation du bien :</strong> ${property.address}</p>
-              <p>Le bien est loué à usage exclusif d'habitation principale, le Preneur déclare bien connaître les lieux pour les avoir vus et visités.</p>
-            </div>
-
-            <div class="section">
-              <h2>Article 1 : Durée</h2>
-              <p>Le présent bail est consenti pour une durée de ${tenant.leaseDuration} mois, prenant cours le ${new Date(tenant.leaseStart).toLocaleDateString('fr-BE')} pour se terminer le ${leaseEndDate.toLocaleDateString('fr-BE')}.</p>
-            </div>
-
-            <div class="section">
-              <h2>Article 2 : Loyer et charges</h2>
-              <p>Le loyer mensuel total est fixé à <strong>${totalRent.toFixed(2)} €</strong> (euros), décomposé comme suit :</p>
-              ${chargesBreakdown}
-              <p>Le loyer est payable par virement anticipativement pour le ${tenant.paymentDueDay} de chaque mois sur le compte bancaire du bailleur : ${ownerInfo.bankAccount || '[IBAN du bailleur]'}.</p>
-              <p>Le loyer de base sera indexé annuellement à la date anniversaire du bail, sur base de l'indice santé, conformément à la législation en vigueur.</p>
-            </div>
-
-            <div class="section">
-              <h2>Article 3 : Garantie locative</h2>
-              <p>Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer, soit <strong>${(tenant.depositAmount || 0).toFixed(2)} €</strong>. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.</p>
-            </div>
-            
-             <div class="section">
-                <h2>Article 4 : État des lieux</h2>
-                <p>Un état des lieux d'entrée détaillé sera dressé contradictoirement et à frais communs par un expert désigné par les parties avant l'entrée en jouissance du Preneur. Il sera annexé au présent contrat et enregistré avec celui-ci.</p>
-            </div>
-
-            <div class="section">
-                <h2>Article 5 : Obligations du preneur</h2>
-                <p>Le Preneur s'engage à jouir du bien loué en bon père de famille, à l'entretenir et à le restituer en fin de bail dans l'état où il l'a reçu, excepté l'usure normale et la vétusté. Il devra contracter une assurance couvrant sa responsabilité locative.</p>
-            </div>
-            
-            <div class="signatures">
-              <div class="signature">
-                  <p>Fait à Bruxelles, le ${new Date().toLocaleDateString('fr-BE')}, en deux exemplaires, chaque partie reconnaissant avoir reçu le sien.</p>
-                  <br/><br/>
-                  <strong>LE BAILLEUR</strong>
-                  <br/><br/><br/><br/>
-                  (Signature)
-              </div>
-              <div class="signature">
-                   <br/><br/><br/><br/><br/><br/>
-                  <strong>LE PRENEUR</strong>
-                  <br/><br/><br/><br/>
-                  (Signature)
-              </div>
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
-    
     try {
-      toast({ title: "Génération du PDF...", description: "Veuillez patienter." });
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      await pdf.html(leaseContent, {
-          callback: function (doc) {
-              const fileName = `Bail-${tenant.lastName}-${tenant.leaseStart}.pdf`;
-              doc.save(fileName);
-          },
-          margin: [15, 15, 15, 15],
-          autoPaging: 'text',
-          width: 180, // width of content within PDF
-          windowWidth: 800 // width of the htmlWindow
-      });
+        const leaseEndDate = new Date(tenant.leaseStart);
+        leaseEndDate.setFullYear(leaseEndDate.getFullYear() + Math.floor((tenant.leaseDuration || 0) / 12));
+        leaseEndDate.setMonth(leaseEndDate.getMonth() + ((tenant.leaseDuration || 0) % 12));
 
-      toast({ title: "Succès", description: "Bail téléchargé." });
+        const totalRent = property.baseRent + (property.chargesWater || 0) + (property.chargesElectricity || 0) + (property.chargesGas || 0) + (property.chargesCommon || 0);
+
+        const pdf = new jsPDF();
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(11);
+
+        const addPageHeaderFooter = (doc: jsPDF, pageNumber: number) => {
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text(`Contrat de Bail - ${tenant.lastName}`, 15, 10);
+            doc.text(`Page ${pageNumber}`, 195, 10, { align: 'right' });
+            doc.line(15, 12, 195, 12); 
+            doc.line(15, 285, 195, 285);
+            doc.text(`Paraphe Bailleur: ________`, 15, 290);
+            doc.text(`Paraphe Preneur: ________`, 195, 290, { align: 'right' });
+        };
+        
+        let pageCount = 1;
+        addPageHeaderFooter(pdf, pageCount);
+
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('CONTRAT DE BAIL DE RÉSIDENCE PRINCIPALE', pdf.internal.pageSize.getWidth() / 2, 30, { align: 'center' });
+        
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text('(Loi du 20 février 1991 - Code du Logement)', pdf.internal.pageSize.getWidth() / 2, 36, { align: 'center' });
+        
+        pdf.autoTable({
+            startY: 45,
+            theme: 'plain',
+            body: [
+                [
+                    { content: 'ENTRE :', styles: { fontStyle: 'bold' } },
+                    { content: 'ET :', styles: { fontStyle: 'bold' } },
+                ],
+                [
+                    { content: `LE BAILLEUR :\n${ownerInfo.name}\n${ownerInfo.address}\n${ownerInfo.companyNumber ? `BCE : ${ownerInfo.companyNumber}`: ''}`},
+                    { content: `LE PRENEUR :\n${tenant.firstName} ${tenant.lastName}\nNationalité : ${tenant.nationality}\nN° National : ${tenant.nationalId}`},
+                ],
+            ],
+            styles: { cellPadding: 2, fontSize: 10 },
+            columnStyles: { 0: { cellWidth: 85 }, 1: { cellWidth: 85 } },
+        });
+
+        const finalY = (pdf as any).lastAutoTable.finalY;
+
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :', 15, finalY + 10);
+
+        const splitText = (text: string, maxWidth: number) => pdf.splitTextToSize(text, maxWidth);
+
+        let yPos = finalY + 20;
+
+        const addSection = (title: string, content: string | string[]) => {
+            if (yPos > 260) {
+                pdf.addPage();
+                pageCount++;
+                addPageHeaderFooter(pdf, pageCount);
+                yPos = 20;
+            }
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(title, 15, yPos);
+            yPos += 7;
+            pdf.setFont('helvetica', 'normal');
+            const lines = Array.isArray(content) ? content : splitText(content, 180);
+            for (const line of lines) {
+                if (yPos > 275) {
+                    pdf.addPage();
+                    pageCount++;
+                    addPageHeaderFooter(pdf, pageCount);
+                    yPos = 20;
+                }
+                pdf.text(line, 15, yPos);
+                yPos += 5;
+            }
+            yPos += 5;
+        }
+
+        addSection('Désignation du bien :', `Le Bailleur loue au Preneur, qui accepte, le bien immobilier suivant : ${property.address}. Le bien est loué à usage exclusif d'habitation principale, le Preneur déclare bien connaître les lieux pour les avoir vus et visités.`);
+        addSection('Article 1 : Durée', `Le présent bail est consenti pour une durée de ${tenant.leaseDuration} mois, prenant cours le ${new Date(tenant.leaseStart).toLocaleDateString('fr-BE')} pour se terminer le ${leaseEndDate.toLocaleDateString('fr-BE')}.`);
+
+        const chargesContent = [
+            `Loyer de base: ${property.baseRent.toFixed(2)} €`,
+            property.chargesWater ? `Provision eau: ${property.chargesWater.toFixed(2)} €` : '',
+            property.chargesElectricity ? `Provision électricité: ${property.chargesElectricity.toFixed(2)} €` : '',
+            property.chargesGas ? `Provision gaz: ${property.chargesGas.toFixed(2)} €` : '',
+            property.chargesCommon ? `Provision charges communes: ${property.chargesCommon.toFixed(2)} €` : '',
+        ].filter(Boolean);
+
+        addSection('Article 2 : Loyer et charges', `Le loyer mensuel total est fixé à ${totalRent.toFixed(2)} € (euros), décomposé comme suit :`);
+        chargesContent.forEach(line => {
+            if (yPos > 275) { pdf.addPage(); pageCount++; addPageHeaderFooter(pdf, pageCount); yPos = 20; }
+            pdf.text(`- ${line}`, 20, yPos);
+            yPos += 5;
+        });
+        
+        yPos += 2;
+        addSection('', [`Le loyer est payable par virement anticipativement pour le ${tenant.paymentDueDay} de chaque mois sur le compte bancaire du bailleur : ${ownerInfo.bankAccount || '[IBAN du bailleur]'}.`, `Le loyer de base sera indexé annuellement à la date anniversaire du bail, sur base de l'indice santé, conformément à la législation en vigueur.`]);
+        addSection('Article 3 : Garantie locative', `Le Preneur remettra au Bailleur une garantie locative équivalente à deux mois de loyer, soit ${(tenant.depositAmount || 0).toFixed(2)} €. Cette garantie sera constituée sur un compte bloqué au nom des deux parties.`);
+        addSection('Article 4 : État des lieux', `Un état des lieux d'entrée détaillé sera dressé contradictoirement et à frais communs par un expert désigné par les parties avant l'entrée en jouissance du Preneur. Il sera annexé au présent contrat et enregistré avec celui-ci.`);
+        addSection('Article 5 : Obligations du preneur', `Le Preneur s'engage à jouir du bien loué en bon père de famille, à l'entretenir et à le restituer en fin de bail dans l'état où il l'a reçu, excepté l'usure normale et la vétusté. Il devra contracter une assurance couvrant sa responsabilité locative.`);
+        
+        if (yPos > 220) { pdf.addPage(); pageCount++; addPageHeaderFooter(pdf, pageCount); yPos = 20; }
+        
+        pdf.text(`Fait à Bruxelles, le ${new Date().toLocaleDateString('fr-BE')}, en deux exemplaires, chaque partie reconnaissant avoir reçu le sien.`, 15, yPos);
+        yPos += 30;
+
+        pdf.text('LE BAILLEUR', 45, yPos, { align: 'center' });
+        pdf.text('LE PRENEUR', 165, yPos, { align: 'center' });
+        yPos += 20;
+        pdf.text('(Signature)', 45, yPos, { align: 'center' });
+        pdf.text('(Signature)', 165, yPos, { align: 'center' });
+        
+        const fileName = `Bail-${tenant.lastName}-${tenant.leaseStart}.pdf`;
+        pdf.save(fileName);
+
+        toast({ title: "Succès", description: "Bail téléchargé." });
 
     } catch (error) {
-      console.error("Error generating lease PDF:", error);
-      toast({ variant: "destructive", title: "Erreur", description: "Impossible de générer le bail." });
+        console.error("Error generating lease PDF:", error);
+        toast({ variant: "destructive", title: "Erreur", description: "Impossible de générer le bail." });
+    } finally {
+        setIsGenerating(false);
     }
   };
 
   const generateNoticeToQuit = async (tenant: Tenant) => {
+    setIsGenerating(true);
     const property = properties.find(p => p.id === tenant.propertyId);
     if (!property || !ownerInfo) {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Informations sur la propriété ou le propriétaire manquantes.' });
+       setIsGenerating(false);
       return;
     }
     
     const tenantUnpaidRents = unpaidRents.filter(rent => rent.tenantId === tenant.id);
     const totalArrears = tenantUnpaidRents.reduce((acc, rent) => acc + (rent.totalDue - rent.totalPaid), 0);
-    const arrearsDetails = tenantUnpaidRents.map(rent => ` - ${rent.period}: ${(rent.totalDue - rent.totalPaid).toFixed(2)} €`).join('\\n');
+    const arrearsDetails = tenantUnpaidRents.map(rent => ` - ${rent.period}: ${(rent.totalDue - rent.totalPaid).toFixed(2)} €`).join('\n');
 
     if (tenantUnpaidRents.length < 2) {
       toast({ variant: 'destructive', title: 'Action non requise', description: 'Une mise en demeure est généralement envoyée après 2 mois de loyers impayés.' });
+      setIsGenerating(false);
       return;
     }
     
-    const noticeContent = `
-      <html>
-        <head><title>Mise en Demeure</title>
-          <style>
-            body { font-family: 'Times New Roman', serif; margin: 2rem; line-height: 1.6; font-size: 12pt; }
-            .container { max-width: 800px; margin: auto; }
-            .sender-info { text-align: left; }
-            .recipient-info { text-align: right; margin: 2rem 0; }
-            .content { text-align: justify; }
-            .bold { font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="sender-info">
-                <p class="bold">${ownerInfo.name}</p>
-                <p>${ownerInfo.address}</p>
-            </div>
-            <div class="recipient-info">
-                <p class="bold">${tenant.firstName} ${tenant.lastName}</p>
-                <p>${property.address}</p>
-            </div>
-            <p>Fait à [Ville], le ${new Date().toLocaleDateString('fr-BE')}</p>
-            <br/>
-            <p><span class="bold">OBJET : Mise en demeure pour non-paiement de loyer</span></p>
-            <p><span class="bold">Lettre Recommandée avec Accusé de Réception</span></p>
-            <br/>
-            <p>Madame, Monsieur,</p>
-            <div class="content">
-                <p>Sauf erreur ou omission de notre part, nous constatons qu'à ce jour, vous n'avez pas réglé les loyers et charges dus pour le logement que vous occupez, situé à l'adresse suivante : ${property.address}.</p>
-                <p>Le montant total des arriérés s'élève à ce jour à <span class="bold">${totalArrears.toFixed(2)} €</span>, correspondant aux périodes suivantes :</p>
-                <pre>${arrearsDetails}</pre>
-                <p>Nous vous mettons donc en demeure de régulariser votre situation en nous faisant parvenir la somme de <span class="bold">${totalArrears.toFixed(2)} €</span> sous un délai de 8 jours à compter de la réception de la présente.</p>
-                <p>À défaut de paiement dans le délai imparti, nous nous verrons contraints d'engager une procédure judiciaire à votre encontre afin d'obtenir le recouvrement des sommes dues et la résiliation du bail, avec toutes les conséquences que cela implique (frais de justice, expulsion, etc.).</p>
-                <p>Dans l'attente de votre règlement, nous vous prions d'agréer, Madame, Monsieur, l'expression de nos salutations distinguées.</p>
-            </div>
-            <br/><br/>
-            <p>Signature</p>
-            <br/>
-            <p>${ownerInfo.name}</p>
-          </div>
-        </body>
-      </html>
-    `;
-    
-    const printContainer = document.createElement('div');
-    printContainer.innerHTML = noticeContent;
-    document.body.appendChild(printContainer);
-    
     try {
-      toast({ title: "Génération du PDF...", description: "Veuillez patienter." });
-      const canvas = await html2canvas(printContainer.querySelector('.container') as HTMLElement);
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`MiseEnDemeure-${tenant.lastName}.pdf`);
-      toast({ title: "Succès", description: "Mise en demeure téléchargée." });
+        const pdf = new jsPDF();
+        pdf.setFontSize(12);
+        
+        pdf.text(ownerInfo.name, 15, 20);
+        pdf.text(ownerInfo.address.split(',')[0], 15, 26);
+        pdf.text(ownerInfo.address.split(',').slice(1).join(',').trim(), 15, 32);
+
+        pdf.text(`${tenant.firstName} ${tenant.lastName}`, 195, 50, { align: 'right' });
+        pdf.text(property.address, 195, 56, { align: 'right' });
+        
+        pdf.text(`Fait à Bruxelles, le ${new Date().toLocaleDateString('fr-BE')}`, 15, 70);
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('OBJET : Mise en demeure pour non-paiement de loyer', 15, 90);
+        pdf.text('Lettre Recommandée avec Accusé de Réception', 15, 96);
+        
+        pdf.setFont('helvetica', 'normal');
+        pdf.text('Madame, Monsieur,', 15, 110);
+        
+        const content = [
+            `Sauf erreur ou omission de notre part, nous constatons qu'à ce jour, vous n'avez pas réglé les loyers et charges dus pour le logement que vous occupez, situé à l'adresse suivante : ${property.address}.`,
+            `Le montant total des arriérés s'élève à ce jour à ${totalArrears.toFixed(2)} €, correspondant aux périodes suivantes :\n${arrearsDetails}`,
+            `Nous vous mettons donc en demeure de régulariser votre situation en nous faisant parvenir la somme de ${totalArrears.toFixed(2)} € sous un délai de 8 jours à compter de la réception de la présente.`,
+            `À défaut de paiement dans le délai imparti, nous nous verrons contraints d'engager une procédure judiciaire à votre encontre afin d'obtenir le recouvrement des sommes dues et la résiliation du bail, avec toutes les conséquences que cela implique (frais de justice, expulsion, etc.).`,
+            `Dans l'attente de votre règlement, nous vous prions d'agréer, Madame, Monsieur, l'expression de nos salutations distinguées.`
+        ];
+        
+        let yPos = 120;
+        content.forEach(p => {
+            const lines = pdf.splitTextToSize(p, 180);
+            pdf.text(lines, 15, yPos);
+            yPos += (lines.length * 5) + 5;
+        });
+
+        yPos += 20;
+        pdf.text('Signature', 15, yPos);
+        yPos += 10;
+        pdf.text(ownerInfo.name, 15, yPos);
+        
+        pdf.save(`MiseEnDemeure-${tenant.lastName}.pdf`);
+        toast({ title: "Succès", description: "Mise en demeure téléchargée." });
+
     } catch (error) {
       toast({ variant: "destructive", title: "Erreur", description: "Impossible de générer le document." });
     } finally {
-      document.body.removeChild(printContainer);
+      setIsGenerating(false);
     }
   };
   
@@ -748,9 +733,15 @@ export default function TenantsPage() {
                             <DropdownMenuItem onClick={() => sendEmail(tenant, 'Contact', `Bonjour ${tenant.firstName}, `)}><Mail className="mr-2 h-4 w-4" />Envoyer Email</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openDepositDialog(tenant)}><ShieldCheck className="mr-2 h-4 w-4" />Gérer la caution</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openEditDialog(tenant)}><Edit className="mr-2 h-4 w-4" />Modifier</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => generateLease(tenant)}><FileText className="mr-2 h-4 w-4" />Télécharger le bail</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => generateLease(tenant)} disabled={isGenerating}>
+                                {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <FileText className="mr-2 h-4 w-4" />}
+                                Télécharger le bail
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => generateNoticeToQuit(tenant)} className="text-amber-600 focus:text-amber-700"><AlertTriangle className="mr-2 h-4 w-4"/>Générer une mise en demeure</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => generateNoticeToQuit(tenant)} className="text-amber-600 focus:text-amber-700" disabled={isGenerating}>
+                                {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <AlertTriangle className="mr-2 h-4 w-4"/>}
+                                Générer une mise en demeure
+                            </DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(tenant)}><Trash2 className="mr-2 h-4 w-4"/>Supprimer</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -994,7 +985,10 @@ export default function TenantsPage() {
             </div>
             <DialogFooter>
                 <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
-                <Button onClick={handleDepositSave}>Enregistrer</Button>
+                <Button onClick={handleDepositSave} disabled={uploading}>
+                    {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                    Enregistrer
+                </Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
